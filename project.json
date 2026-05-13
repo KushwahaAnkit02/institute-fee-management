@@ -1,0 +1,28 @@
+{
+  "overview": "Akshay Classes Fee Management Portal — a premium full-stack SaaS application for managing student fees, payments, and notifications. Built with React, Supabase, and a polished glassmorphism dashboard design.",
+  "features": [
+    "Premium landing page with animated hero, features, stats, testimonials, FAQ, pricing, and contact sections",
+    "Role-based authentication for admins and students with protected layouts",
+    "Admin dashboard with revenue charts, student management, and notification system",
+    "Enhanced student forms with 14+ fields, searchable dropdowns, Indian phone validation, and enrollment code generation",
+    "Class and section management system for organizing students",
+    "Student credentials modal showing enrollment code after account creation",
+    "Student portal with fee overview, UPI/QR payment flow, payment history, and receipt printing",
+    "Enrollment code linking flow for students to connect their account on first login",
+    "Dark and light mode with persistent theme",
+    "Fully responsive mobile-first design"
+  ],
+  "category": "education",
+  "tags": [
+    "fee-management",
+    "education",
+    "saas-dashboard",
+    "react",
+    "supabase",
+    "institute",
+    "payments",
+    "admin-portal",
+    "student-portal"
+  ],
+  "last_updated": "2026-05-13T14:54:09.932Z"
+}
