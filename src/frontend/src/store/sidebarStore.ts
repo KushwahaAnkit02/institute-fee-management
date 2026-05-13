@@ -1,0 +1,18 @@
+import { create } from "zustand";
+
+interface SidebarStore {
+  isCollapsed: boolean;
+  isMobileOpen: boolean;
+  toggleCollapse: () => void;
+  toggleMobile: () => void;
+  setMobileOpen: (open: boolean) => void;
+}
+
+export const useSidebarStore = create<SidebarStore>()((set) => ({
+  isCollapsed: false,
+  isMobileOpen: false,
+
+  toggleCollapse: () => set((state) => ({ isCollapsed: !state.isCollapsed })),
+  toggleMobile: () => set((state) => ({ isMobileOpen: !state.isMobileOpen })),
+  setMobileOpen: (isMobileOpen) => set({ isMobileOpen }),
+}));

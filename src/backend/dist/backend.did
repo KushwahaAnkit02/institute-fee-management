@@ -1,0 +1,178 @@
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserId = text;
+type UpdateStudentRequest = 
+ record {
+   class: opt text;
+   course: opt text;
+   email: opt text;
+   is_active: opt bool;
+   monthly_fee: opt nat;
+   name: opt text;
+ };
+type UpdateProfileRequest = 
+ record {
+   avatar_url: opt text;
+   email: opt text;
+   is_active: opt bool;
+   name: opt text;
+   phone: opt text;
+ };
+type UpdatePaymentRequest = 
+ record {
+   amount_paid: opt nat;
+   notes: opt text;
+   payment_date: opt Timestamp;
+   payment_method: opt PaymentMethod;
+ };
+type Timestamp = int;
+type Student = 
+ record {
+   admin_id: UserId;
+   class: text;
+   course: text;
+   created_at: Timestamp;
+   email: text;
+   fee_start_date: Timestamp;
+   id: text;
+   is_active: bool;
+   joined_date: Timestamp;
+   monthly_fee: nat;
+   name: text;
+   profile_id: opt UserId;
+   updated_at: Timestamp;
+ };
+type Role = 
+ variant {
+   admin;
+   student;
+ };
+type RecordPaymentRequest = 
+ record {
+   amount_paid: nat;
+   month: text;
+   notes: opt text;
+   payment_date: Timestamp;
+   payment_method: PaymentMethod;
+   student_id: text;
+ };
+type Profile = 
+ record {
+   avatar_url: opt text;
+   created_at: Timestamp;
+   email: text;
+   id: UserId;
+   is_active: bool;
+   name: text;
+   phone: opt text;
+   role: Role;
+   updated_at: Timestamp;
+ };
+type PaymentMethod = 
+ variant {
+   card;
+   cash;
+   cheque;
+   online;
+ };
+type NotificationType = 
+ variant {
+   custom;
+   fee_due;
+   overdue;
+   payment_received;
+ };
+type Notification = 
+ record {
+   admin_id: UserId;
+   created_at: Timestamp;
+   id: text;
+   is_read: bool;
+   message: text;
+   student_id: opt UserId;
+   title: text;
+   "type": NotificationType;
+ };
+type MonthlyPayment = 
+ record {
+   admin_id: UserId;
+   amount_paid: nat;
+   created_at: Timestamp;
+   id: text;
+   month: text;
+   notes: opt text;
+   payment_date: Timestamp;
+   payment_method: PaymentMethod;
+   student_id: text;
+ };
+type CreateStudentRequest = 
+ record {
+   class: text;
+   course: text;
+   email: text;
+   fee_start_date: Timestamp;
+   joined_date: Timestamp;
+   monthly_fee: nat;
+   name: text;
+ };
+type CreateProfileRequest = 
+ record {
+   avatar_url: opt text;
+   email: text;
+   name: text;
+   phone: opt text;
+   role: Role;
+ };
+type CreateNotificationRequest = 
+ record {
+   message: text;
+   student_id: opt UserId;
+   title: text;
+   "type": NotificationType;
+ };
+type CreateAdminRequest = 
+ record {
+   address: opt text;
+   institute_code: text;
+   institute_name: text;
+ };
+type Admin = 
+ record {
+   address: opt text;
+   created_at: Timestamp;
+   id: UserId;
+   institute_code: text;
+   institute_name: text;
+   profile_id: UserId;
+ };
+service : {
+  _initializeAccessControl: () -> ();
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  createAdmin: (req: CreateAdminRequest) -> (Admin);
+  createNotification: (req: CreateNotificationRequest) -> (Notification);
+  createProfile: (req: CreateProfileRequest) -> (Profile);
+  createStudent: (req: CreateStudentRequest) -> (Student);
+  deletePayment: (paymentId: text) -> (bool);
+  getAdminByProfile: () -> (opt Admin) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getMyProfile: () -> (opt Profile) query;
+  getNotificationsByAdmin: () -> (vec Notification) query;
+  getNotificationsByStudent: () -> (vec Notification) query;
+  getPaymentsByAdmin: () -> (vec MonthlyPayment) query;
+  getPaymentsByStudent: () -> (vec MonthlyPayment) query;
+  getStudentByProfile: () -> (opt Student) query;
+  getStudentsByAdmin: () -> (vec Student) query;
+  isCallerAdmin: () -> (bool) query;
+  markAllNotificationsRead: () -> (nat);
+  markNotificationRead: (notifId: text) -> (bool);
+  recordPayment: (req: RecordPaymentRequest) -> (MonthlyPayment);
+  updatePayment: (paymentId: text, req: UpdatePaymentRequest) ->
+   (opt MonthlyPayment);
+  updateProfile: (req: UpdateProfileRequest) -> (opt Profile);
+  updateStudent: (studentId: text, req: UpdateStudentRequest) ->
+   (opt Student);
+}

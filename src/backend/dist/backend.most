@@ -1,0 +1,117 @@
+// Version: 1.0.0
+type Admin__283569800 =
+  {
+    address : ?Text;
+    created_at : Timestamp__301639476;
+    id : UserId__158757552;
+    institute_code : Text;
+    institute_name : Text;
+    profile_id : UserId__158757552
+  };
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type Int__270357528 = Int__616954475;
+type Int__616954475 = Int;
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type MonthlyPayment__302287223 =
+  {
+    admin_id : UserId__158757552;
+    amount_paid : Nat;
+    created_at : Timestamp__301639476;
+    id : Text;
+    month : Text;
+    notes : ?Text;
+    payment_date : Timestamp__301639476;
+    payment_method : PaymentMethod__46913440;
+    student_id : Text
+  };
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type NotificationType__338939744 =
+  {#custom; #fee_due; #overdue; #payment_received};
+type Notification__264708741 =
+  {
+    admin_id : UserId__158757552;
+    created_at : Timestamp__301639476;
+    id : Text;
+    is_read : Bool;
+    message : Text;
+    student_id : ?UserId__158757552;
+    title : Text;
+    type_ : NotificationType__338939744
+  };
+type PaymentMethod__46913440 = {#card; #cash; #cheque; #online};
+type Profile__469549097 =
+  {
+    avatar_url : ?Text;
+    created_at : Timestamp__301639476;
+    email : Text;
+    id : UserId__158757552;
+    is_active : Bool;
+    name : Text;
+    phone : ?Text;
+    role : Role__300349085;
+    updated_at : Timestamp__301639476
+  };
+type Role__300349085 = {#admin; #student};
+type Student__26715999 =
+  {
+    admin_id : UserId__158757552;
+    class_ : Text;
+    course : Text;
+    created_at : Timestamp__301639476;
+    email : Text;
+    fee_start_date : Timestamp__301639476;
+    id : Text;
+    is_active : Bool;
+    joined_date : Timestamp__301639476;
+    monthly_fee : Nat;
+    name : Text;
+    profile_id : ?UserId__158757552;
+    updated_at : Timestamp__301639476
+  };
+type Time__796480547 = Int__270357528;
+type Time__900049286 = Time__796480547;
+type Timestamp__301639476 = Time__900049286;
+type UserId__158757552 = Text;
+type UserRole__1073662873 = {#admin; #guest; #user};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1073662873>
+    };
+  stable admins :
+    {
+      var root : Node__46230540<Text, Admin__283569800>;
+      var size : Nat__490723111
+    };
+  stable notifications :
+    {
+      var root : Node__46230540<Text, Notification__264708741>;
+      var size : Nat__490723111
+    };
+  stable payments :
+    {
+      var root : Node__46230540<Text, MonthlyPayment__302287223>;
+      var size : Nat__490723111
+    };
+  stable profiles :
+    {
+      var root : Node__46230540<Text, Profile__469549097>;
+      var size : Nat__490723111
+    };
+  stable students :
+    {
+      var root : Node__46230540<Text, Student__26715999>;
+      var size : Nat__490723111
+    }
+};

@@ -1,0 +1,27 @@
+{
+  "overview": "A complete fee management system for Akshay Classes with admin and student portals, built entirely with React and localStorage — no backend required. Admins manage students, track payments, and send notifications. Students view their fee status and payment history.",
+  "features": [
+    "Role-based login for admin and student with localStorage persistence",
+    "Admin dashboard with revenue charts, student stats, and recent payments",
+    "Student management with add, edit, delete, search, filter, and pagination",
+    "Payment recording and history with month/status filtering",
+    "Notifications with bell badge, send modal, and toast alerts",
+    "Student portal with fee summary, payment history, and profile",
+    "Dark and light mode with localStorage persistence",
+    "Responsive mobile-first design with collapsible sidebar and drawer",
+    "Loading skeletons, empty states, confirmation modals throughout",
+    "Automatic demo seed data on first load"
+  ],
+  "category": "productivity",
+  "tags": [
+    "fee-management",
+    "education",
+    "dashboard",
+    "react",
+    "typescript",
+    "localstorage",
+    "admin",
+    "students"
+  ],
+  "last_updated": "2026-05-11T05:43:43.773Z"
+}
