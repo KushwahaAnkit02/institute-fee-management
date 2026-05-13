@@ -1,3 +1,4 @@
+import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import ReactDOM from "react-dom/client";
@@ -7,7 +8,9 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <QueryProvider>
     <ThemeProvider>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </ThemeProvider>
   </QueryProvider>,
 );

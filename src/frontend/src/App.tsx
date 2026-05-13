@@ -1,7 +1,7 @@
-import { PageTransition } from "@/components/shared/PageTransition";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { StudentLayout } from "@/layouts/StudentLayout";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -33,8 +33,9 @@ const indexRoute = createRoute({
   path: "/",
   component: LandingPage,
   beforeLoad: () => {
-    const { isAuthenticated, user } = useAuthStore.getState();
-    if (isAuthenticated && user) {
+    // Only redirect if auth has fully resolved (isLoading === false)
+    const { isAuthenticated, isLoading, user } = useAuthStore.getState();
+    if (!isLoading && isAuthenticated && user) {
       throw redirect({
         to: user.role === "admin" ? "/admin/dashboard" : "/student/dashboard",
       });
@@ -196,7 +197,69 @@ declare module "@tanstack/react-router" {
   }
 }
 
+function SupabaseSetupScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="max-w-lg w-full text-center space-y-6">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+          <svg
+            role="img"
+            aria-label="Setup"
+            className="w-8 h-8 text-primary"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">
+            Supabase not configured
+          </h1>
+          <p className="text-muted-foreground leading-relaxed">
+            To get started, add your Supabase credentials to{" "}
+            <code className="px-1.5 py-0.5 rounded bg-muted text-sm font-mono text-foreground">
+              src/frontend/.env
+            </code>
+            , then restart the dev server.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-muted/40 p-4 text-left space-y-1">
+          <p className="text-xs font-mono text-muted-foreground">
+            # src/frontend/.env
+          </p>
+          <p className="text-sm font-mono text-foreground">
+            VITE_SUPABASE_URL=https://your-project.supabase.co
+          </p>
+          <p className="text-sm font-mono text-foreground">
+            VITE_SUPABASE_ANON_KEY=your-anon-key
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Find these values in your Supabase project under{" "}
+          <strong>Settings → API</strong>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  if (!isSupabaseConfigured) {
+    return (
+      <>
+        <SupabaseSetupScreen />
+        <Toaster position="top-right" richColors />
+      </>
+    );
+  }
+
   return (
     <>
       <RouterProvider router={router} />

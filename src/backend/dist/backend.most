@@ -58,18 +58,27 @@ type Notification__264708741 =
   };
 type OldStudent__333394504 =
   {
+    address : ?Text;
     admin_id : Text;
+    admission_date : ?Text;
     class_ : Text;
     course : Text;
     created_at : Int;
+    dob : ?Text;
     email : Text;
+    enrollment_number : ?Text;
     fee_start_date : Int;
+    gender : ?Text;
     id : Text;
     is_active : Bool;
     joined_date : Int;
     monthly_fee : Nat;
     name : Text;
+    parent_name : ?Text;
+    parent_phone : ?Text;
+    phone : ?Text;
     profile_id : ?Text;
+    section : ?Text;
     updated_at : Int
   };
 type PaymentMethod__46913440 = {#card; #cash; #cheque; #online};
@@ -135,6 +144,7 @@ actor ({
       var root : Node__46230540<Text, Admin__283569800>;
       var size : Nat__490723111
     };
+  in classes : Map__605269027<Text, ClassRecord__734901508>;
   stable notifications :
     {
       var root : Node__46230540<Text, Notification__264708741>;
@@ -150,6 +160,7 @@ actor ({
       var root : Node__46230540<Text, Profile__469549097>;
       var size : Nat__490723111
     };
+  in sections : Map__605269027<Text, SectionRecord__492154375>;
   in students : Map__605269027<Text, OldStudent__333394504>
 }, {
   stable accessControlState :

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import {
   buildAuthUser,
   logout as supabaseLogout,
@@ -19,6 +19,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+
+    // Short-circuit: if Supabase is not configured, mark loading done immediately
+    if (!isSupabaseConfigured) {
+      if (mounted) storeLogout();
+      return () => {
+        mounted = false;
+      };
+    }
 
     // 1. Restore existing session on mount
     const initSession = async () => {

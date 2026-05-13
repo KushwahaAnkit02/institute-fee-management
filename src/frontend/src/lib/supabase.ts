@@ -1,22 +1,45 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
+  | string
+  | undefined;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+/**
+ * True when both Supabase env vars are present and non-empty.
+ * When false, all Supabase calls are no-ops and the app renders a setup screen.
+ */
+export const isSupabaseConfigured =
+  typeof supabaseUrl === "string" &&
+  supabaseUrl.length > 0 &&
+  supabaseUrl !== "undefined" &&
+  typeof supabaseAnonKey === "string" &&
+  supabaseAnonKey.length > 0 &&
+  supabaseAnonKey !== "undefined";
+
+if (!isSupabaseConfigured) {
   console.warn(
-    "[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. " +
-      "Add them to src/frontend/.env",
+    "[Supabase] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing.\n" +
+      "Add them to src/frontend/.env, then restart the dev server.",
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
+// Always create a client, but use placeholder values when unconfigured so
+// the module loads without throwing. Real calls will fail gracefully because
+// AuthProvider skips them when isSupabaseConfigured is false.
+export const supabase = createClient(
+  isSupabaseConfigured
+    ? (supabaseUrl as string)
+    : "https://placeholder.supabase.co",
+  isSupabaseConfigured ? (supabaseAnonKey as string) : "placeholder-anon-key",
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
   },
-});
+);
 
 // ---------------------------------------------------------------------------
 // Database type definitions matching the Supabase schema

@@ -3,7 +3,10 @@ import StudentTypes "types/students";
 import ClassTypes "types/classes";
 
 module {
-  // --- Old types (Student before the 9 new optional fields) ---
+  // --- Old types: Student shape as it exists in the currently deployed stable state ---
+  // The address and other optional fields are already present in stable storage
+  // (a previous migration added them). This OldStudent must exactly match
+  // what is currently stored so the compatibility check passes.
   type OldStudent = {
     id : Text;
     profile_id : ?Text;
@@ -16,13 +19,26 @@ module {
     joined_date : Int;
     fee_start_date : Int;
     is_active : Bool;
+    phone : ?Text;
+    gender : ?Text;
+    dob : ?Text;
+    address : ?Text;
+    parent_name : ?Text;
+    parent_phone : ?Text;
+    section : ?Text;
+    enrollment_number : ?Text;
+    admission_date : ?Text;
     created_at : Int;
     updated_at : Int;
   };
 
   // --- OldActor: stable fields from the previous deployed version ---
+  // Must include ALL stable vars that existed in the previously deployed actor.
+  // Listing classes and sections here prevents "cannot be implicitly discarded" errors.
   type OldActor = {
     students : Map.Map<Text, OldStudent>;
+    classes : Map.Map<Text, ClassTypes.ClassRecord>;
+    sections : Map.Map<Text, ClassTypes.SectionRecord>;
   };
 
   // --- NewActor: stable fields in the new version ---
@@ -32,40 +48,18 @@ module {
     sections : Map.Map<Text, ClassTypes.SectionRecord>;
   };
 
-  // Migrate OldStudent → Student by adding all 9 new optional fields as null
+  // Migrate OldStudent → Student (types are now identical; this is a pass-through)
   func migrateStudent(_id : Text, old : OldStudent) : StudentTypes.Student {
-    {
-      id = old.id;
-      profile_id = old.profile_id;
-      admin_id = old.admin_id;
-      name = old.name;
-      email = old.email;
-      class_ = old.class_;
-      course = old.course;
-      monthly_fee = old.monthly_fee;
-      joined_date = old.joined_date;
-      fee_start_date = old.fee_start_date;
-      is_active = old.is_active;
-      phone = null;
-      gender = null;
-      dob = null;
-      address = null;
-      parent_name = null;
-      parent_phone = null;
-      section = null;
-      enrollment_number = null;
-      admission_date = null;
-      created_at = old.created_at;
-      updated_at = old.updated_at;
-    };
+    old;
   };
 
   public func run(old : OldActor) : NewActor {
     let students = old.students.map<Text, OldStudent, StudentTypes.Student>(migrateStudent);
+    // Preserve existing classes/sections from old stable state, or use empty maps if not present.
     {
       students;
-      classes = Map.empty<Text, ClassTypes.ClassRecord>();
-      sections = Map.empty<Text, ClassTypes.SectionRecord>();
+      classes = old.classes;
+      sections = old.sections;
     };
   };
 };

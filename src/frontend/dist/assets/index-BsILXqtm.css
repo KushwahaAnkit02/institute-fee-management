@@ -1370,6 +1370,9 @@ video {
 .max-w-\[calc\(100\%-2rem\)\] {
   max-width: calc(100% - 2rem);
 }
+.max-w-lg {
+  max-width: 32rem;
+}
 .max-w-max {
   max-width: -moz-max-content;
   max-width: max-content;
