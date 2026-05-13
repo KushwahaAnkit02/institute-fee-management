@@ -6,12 +6,16 @@ import AdminTypes "types/admins";
 import StudentTypes "types/students";
 import PaymentTypes "types/payments";
 import NotifTypes "types/notifications";
+import ClassTypes "types/classes";
 import ProfilesApi "mixins/profiles-api";
 import AdminsApi "mixins/admins-api";
 import StudentsApi "mixins/students-api";
 import PaymentsApi "mixins/payments-api";
 import NotificationsApi "mixins/notifications-api";
+import ClassesApi "mixins/classes-api";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   // --- Authorization state (manages Internet Identity roles) ---
   let accessControlState = AccessControl.initState();
@@ -23,6 +27,8 @@ actor {
   let students = Map.empty<Text, StudentTypes.Student>();
   let payments = Map.empty<Text, PaymentTypes.MonthlyPayment>();
   let notifications = Map.empty<Text, NotifTypes.Notification>();
+  let classes = Map.empty<Text, ClassTypes.ClassRecord>();
+  let sections = Map.empty<Text, ClassTypes.SectionRecord>();
 
   // --- Mixin includes (delegate all public API) ---
   include ProfilesApi(accessControlState, profiles, students);
@@ -30,5 +36,6 @@ actor {
   include StudentsApi(accessControlState, students, admins);
   include PaymentsApi(accessControlState, payments, students, admins, notifications);
   include NotificationsApi(accessControlState, notifications, admins, students);
+  include ClassesApi(accessControlState, classes, sections, admins);
 };
 

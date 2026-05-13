@@ -18,11 +18,19 @@ export interface Admin {
   'address' : [] | [string],
   'profile_id' : UserId,
 }
+export interface ClassRecord {
+  'id' : string,
+  'admin_id' : UserId,
+  'name' : string,
+  'description' : string,
+  'created_at' : Timestamp,
+}
 export interface CreateAdminRequest {
   'institute_code' : string,
   'institute_name' : string,
   'address' : [] | [string],
 }
+export interface CreateClassForm { 'name' : string, 'description' : string }
 export interface CreateNotificationRequest {
   'title' : string,
   'type' : NotificationType,
@@ -36,14 +44,24 @@ export interface CreateProfileRequest {
   'email' : string,
   'phone' : [] | [string],
 }
+export interface CreateSectionForm { 'name' : string, 'class_id' : string }
 export interface CreateStudentRequest {
+  'dob' : [] | [string],
   'joined_date' : Timestamp,
   'class' : string,
   'name' : string,
   'fee_start_date' : Timestamp,
+  'section' : [] | [string],
+  'admission_date' : [] | [string],
   'email' : string,
+  'enrollment_number' : [] | [string],
+  'parent_phone' : [] | [string],
+  'address' : [] | [string],
+  'gender' : [] | [string],
+  'phone' : [] | [string],
   'monthly_fee' : bigint,
   'course' : string,
+  'parent_name' : [] | [string],
 }
 export interface MonthlyPayment {
   'id' : string,
@@ -95,22 +113,39 @@ export interface RecordPaymentRequest {
 }
 export type Role = { 'admin' : null } |
   { 'student' : null };
+export interface SectionRecord {
+  'id' : string,
+  'admin_id' : UserId,
+  'name' : string,
+  'created_at' : Timestamp,
+  'class_id' : string,
+}
 export interface Student {
   'id' : string,
+  'dob' : [] | [string],
   'updated_at' : Timestamp,
   'joined_date' : Timestamp,
   'admin_id' : UserId,
   'class' : string,
   'name' : string,
   'fee_start_date' : Timestamp,
+  'section' : [] | [string],
   'created_at' : Timestamp,
+  'admission_date' : [] | [string],
   'email' : string,
+  'enrollment_number' : [] | [string],
+  'parent_phone' : [] | [string],
+  'address' : [] | [string],
+  'gender' : [] | [string],
   'is_active' : boolean,
+  'phone' : [] | [string],
   'monthly_fee' : bigint,
   'course' : string,
   'profile_id' : [] | [UserId],
+  'parent_name' : [] | [string],
 }
 export type Timestamp = bigint;
+export interface UpdateClassForm { 'name' : string, 'description' : string }
 export interface UpdatePaymentRequest {
   'payment_date' : [] | [Timestamp],
   'payment_method' : [] | [PaymentMethod],
@@ -125,12 +160,21 @@ export interface UpdateProfileRequest {
   'phone' : [] | [string],
 }
 export interface UpdateStudentRequest {
+  'dob' : [] | [string],
   'class' : [] | [string],
   'name' : [] | [string],
+  'section' : [] | [string],
+  'admission_date' : [] | [string],
   'email' : [] | [string],
+  'enrollment_number' : [] | [string],
+  'parent_phone' : [] | [string],
+  'address' : [] | [string],
+  'gender' : [] | [string],
   'is_active' : [] | [boolean],
+  'phone' : [] | [string],
   'monthly_fee' : [] | [bigint],
   'course' : [] | [string],
+  'parent_name' : [] | [string],
 }
 export type UserId = string;
 export type UserRole = { 'admin' : null } |
@@ -140,23 +184,31 @@ export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createAdmin' : ActorMethod<[CreateAdminRequest], Admin>,
+  'createClass' : ActorMethod<[CreateClassForm], ClassRecord>,
   'createNotification' : ActorMethod<[CreateNotificationRequest], Notification>,
   'createProfile' : ActorMethod<[CreateProfileRequest], Profile>,
+  'createSection' : ActorMethod<[CreateSectionForm], SectionRecord>,
   'createStudent' : ActorMethod<[CreateStudentRequest], Student>,
+  'deleteClass' : ActorMethod<[string], boolean>,
   'deletePayment' : ActorMethod<[string], boolean>,
+  'deleteSection' : ActorMethod<[string], boolean>,
   'getAdminByProfile' : ActorMethod<[], [] | [Admin]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getClassesByAdmin' : ActorMethod<[], Array<ClassRecord>>,
   'getMyProfile' : ActorMethod<[], [] | [Profile]>,
   'getNotificationsByAdmin' : ActorMethod<[], Array<Notification>>,
   'getNotificationsByStudent' : ActorMethod<[], Array<Notification>>,
   'getPaymentsByAdmin' : ActorMethod<[], Array<MonthlyPayment>>,
   'getPaymentsByStudent' : ActorMethod<[], Array<MonthlyPayment>>,
+  'getSectionsByAdmin' : ActorMethod<[], Array<SectionRecord>>,
+  'getSectionsByClass' : ActorMethod<[string], Array<SectionRecord>>,
   'getStudentByProfile' : ActorMethod<[], [] | [Student]>,
   'getStudentsByAdmin' : ActorMethod<[], Array<Student>>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'markAllNotificationsRead' : ActorMethod<[], bigint>,
   'markNotificationRead' : ActorMethod<[string], boolean>,
   'recordPayment' : ActorMethod<[RecordPaymentRequest], MonthlyPayment>,
+  'updateClass' : ActorMethod<[string, UpdateClassForm], [] | [ClassRecord]>,
   'updatePayment' : ActorMethod<
     [string, UpdatePaymentRequest],
     [] | [MonthlyPayment]

@@ -43,7 +43,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (user: AuthUser) => void;
-  logout: () => void;
+  logout: () => void | Promise<void>;
   setLoading: (loading: boolean) => void;
 }
 

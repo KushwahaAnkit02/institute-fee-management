@@ -3,7 +3,9 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { StudentLayout } from "@/layouts/StudentLayout";
 import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
+import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { AdminClassesPage } from "@/pages/admin/AdminClassesPage";
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
 import { AdminFeesPage } from "@/pages/admin/AdminFeesPage";
 import { AdminNotificationsPage } from "@/pages/admin/AdminNotificationsPage";
@@ -29,6 +31,7 @@ const rootRoute = createRootRoute();
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  component: LandingPage,
   beforeLoad: () => {
     const { isAuthenticated, user } = useAuthStore.getState();
     if (isAuthenticated && user) {
@@ -36,7 +39,6 @@ const indexRoute = createRoute({
         to: user.role === "admin" ? "/admin/dashboard" : "/student/dashboard",
       });
     }
-    throw redirect({ to: "/login" });
   },
 });
 
@@ -108,6 +110,12 @@ const adminSettingsRoute = createRoute({
   component: AdminSettingsPage,
 });
 
+const adminClassesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/admin/classes",
+  component: AdminClassesPage,
+});
+
 // Student
 const studentGuardRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -166,6 +174,7 @@ const routeTree = rootRoute.addChildren([
       adminPaymentsRoute,
       adminNotificationsRoute,
       adminSettingsRoute,
+      adminClassesRoute,
     ]),
   ]),
   studentGuardRoute.addChildren([

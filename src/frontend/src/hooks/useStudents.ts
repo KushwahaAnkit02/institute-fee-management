@@ -1,4 +1,5 @@
 import * as studentSvc from "@/services/studentService";
+import { getStudentByProfileId } from "@/services/studentService";
 import { useAuthStore } from "@/store/authStore";
 import type {
   CreateStudentForm,
@@ -14,6 +15,17 @@ export function useStudents() {
     queryKey: ["students", adminId],
     queryFn: () => studentSvc.getStudents(adminId!),
     enabled: !!adminId,
+    staleTime: 0,
+  });
+}
+
+/** Student-scoped: fetches the student record linked to the current user's profile. */
+export function useMyStudentRecord() {
+  const user = useAuthStore((s) => s.user);
+  return useQuery<Student | null>({
+    queryKey: ["student", "profile", user?.id],
+    queryFn: () => (user?.id ? getStudentByProfileId(user.id) : null),
+    enabled: !!user?.id && user?.role === "student",
     staleTime: 0,
   });
 }

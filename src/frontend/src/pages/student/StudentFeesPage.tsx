@@ -1,3 +1,4 @@
+import { ReceiptModal } from "@/components/modals/ReceiptModal";
 import { UpiPayModal } from "@/components/modals/UpiPayModal";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -11,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { usePaymentsByStudent } from "@/hooks/usePayments";
-import { useStudents } from "@/hooks/useStudents";
+import { useMyPayments } from "@/hooks/usePayments";
+import { useMyStudentRecord } from "@/hooks/useStudents";
 import { useAuthStore } from "@/store/authStore";
 import {
   formatMonth,
@@ -28,6 +29,7 @@ import {
   Clock,
   CreditCard,
   IndianRupee,
+  Receipt,
   TrendingUp,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -103,10 +105,9 @@ const STATUS_CONFIG = {
 
 export default function StudentFeesPage() {
   const { user } = useAuthStore();
-  const studentId = user?.id ?? "";
-  const { data: allStudents = [] } = useStudents();
-  const { data: payments = [], isLoading } = usePaymentsByStudent(studentId);
-  const studentRecord = allStudents.find((s) => s.id === studentId);
+  const { data: studentRecord, isLoading: studentLoading } =
+    useMyStudentRecord();
+  const { data: payments = [], isLoading } = useMyPayments();
 
   const currentMonth = getCurrentMonthKey();
   const monthlyFee = studentRecord?.monthly_fee ?? 0;
@@ -127,22 +128,36 @@ export default function StudentFeesPage() {
   }, [allMonths]);
 
   const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<"all" | "paid" | "pending">("all");
   const [payModal, setPayModal] = useState<{
     monthKey: string;
     monthLabel: string;
     amountDue: number;
   } | null>(null);
+  const [receiptModal, setReceiptModal] = useState<{
+    payment: import("@/types/payment").Payment;
+    student: import("@/types/student").Student;
+  } | null>(null);
   const queryClient = useQueryClient();
 
-  const filteredMonths = useMemo(() => {
+  const filteredByYear = useMemo(() => {
     if (selectedYear === "all") return allMonths;
     return allMonths.filter((m) => m.year === Number(selectedYear));
   }, [allMonths, selectedYear]);
 
-  const overdueCount = filteredMonths.filter(
+  const filteredMonths = useMemo(() => {
+    if (activeTab === "paid")
+      return filteredByYear.filter((m) => m.status === "Paid");
+    if (activeTab === "pending")
+      return filteredByYear.filter((m) => m.status !== "Paid");
+    return filteredByYear;
+  }, [filteredByYear, activeTab]);
+
+  const overdueCount = filteredByYear.filter(
     (m) => m.status === "Pending",
   ).length;
-  const paidCount = filteredMonths.filter((m) => m.status === "Paid").length;
+  const paidCount = filteredByYear.filter((m) => m.status === "Paid").length;
+  const pendingCount = filteredByYear.filter((m) => m.status !== "Paid").length;
 
   const summaryCards = [
     {
@@ -170,6 +185,19 @@ export default function StudentFeesPage() {
       bg: pendingThisMonth === 0 ? "bg-emerald-500/10" : "bg-amber-500/10",
     },
   ];
+
+  // Find the payment for a paid month (for receipt)
+  function getPaymentForMonth(monthKey: string) {
+    return (
+      payments
+        .filter((p) => p.month === monthKey)
+        .sort(
+          (a, b) =>
+            new Date(b.payment_date).getTime() -
+            new Date(a.payment_date).getTime(),
+        )[0] ?? null
+    );
+  }
 
   return (
     <PageTransition>
@@ -220,16 +248,29 @@ export default function StudentFeesPage() {
               className="glass-card rounded-2xl p-5 shadow-soft cursor-default"
               data-ocid={`student-fees.summary_card.${idx + 1}`}
             >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm text-muted-foreground">{card.title}</p>
-                <div className={`p-2 rounded-xl ${card.bg} ${card.accent}`}>
-                  <card.icon className="w-4 h-4" />
+              {studentLoading ? (
+                <div className="space-y-2">
+                  <div className="h-3 w-24 bg-muted/60 rounded animate-pulse" />
+                  <div className="h-6 w-32 bg-muted/60 rounded animate-pulse" />
                 </div>
-              </div>
-              <p className="font-display text-2xl font-bold text-foreground tracking-tight">
-                {card.value}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-sm text-muted-foreground">
+                      {card.title}
+                    </p>
+                    <div className={`p-2 rounded-xl ${card.bg} ${card.accent}`}>
+                      <card.icon className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="font-display text-2xl font-bold text-foreground tracking-tight">
+                    {card.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {card.sub}
+                  </p>
+                </>
+              )}
             </motion.div>
           ))}
         </div>
@@ -293,26 +334,64 @@ export default function StudentFeesPage() {
           transition={{ duration: 0.4, delay: 0.25 }}
           className="glass-card rounded-2xl shadow-soft overflow-hidden"
         >
-          <div className="px-5 py-4 border-b border-border/30 flex flex-col sm:flex-row sm:items-center gap-3">
-            <h3 className="font-display font-semibold text-foreground flex-1">
-              Monthly Fee Status
-            </h3>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger
-                className="w-full sm:w-36 bg-card/60"
-                data-ocid="student-fees.year_filter"
-              >
-                <SelectValue placeholder="All years" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Years</SelectItem>
-                {years.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="px-5 py-4 border-b border-border/30">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <h3 className="font-display font-semibold text-foreground flex-1">
+                Monthly Fee Status
+              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Status count chips */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-full">
+                    <span className="font-semibold text-emerald-600">
+                      {paidCount}
+                    </span>{" "}
+                    paid
+                  </span>
+                  <span className="text-xs text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-full">
+                    <span className="font-semibold text-amber-600">
+                      {pendingCount}
+                    </span>{" "}
+                    pending
+                  </span>
+                </div>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger
+                    className="w-full sm:w-36 bg-card/60"
+                    data-ocid="student-fees.year_filter"
+                  >
+                    <SelectValue placeholder="All years" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Years</SelectItem>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex gap-1 mt-3 p-1 bg-muted/40 rounded-xl w-fit">
+              {(["all", "paid", "pending"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
+                    activeTab === tab
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-ocid={`student-fees.tab.${tab}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
 
           {isLoading ? (
@@ -322,14 +401,27 @@ export default function StudentFeesPage() {
           ) : filteredMonths.length === 0 ? (
             <EmptyState
               icon={BookOpen}
-              title="No fee records"
-              description="Fee records will appear here after your fee start date."
+              title={
+                activeTab === "paid"
+                  ? "No paid months yet"
+                  : activeTab === "pending"
+                    ? "No pending fees — all clear!"
+                    : "No fee records"
+              }
+              description={
+                activeTab === "paid"
+                  ? "Pay your fees and they'll show here."
+                  : activeTab === "pending"
+                    ? "Great job keeping up with payments!"
+                    : "Fee records will appear here after your fee start date."
+              }
               dataOcid="student-fees.empty_state"
             />
           ) : (
             <div className="p-4 space-y-2.5">
               {filteredMonths.map(({ key, paid, status }) => {
                 const cfg = STATUS_CONFIG[status];
+                const monthPayment = getPaymentForMonth(key);
                 return (
                   <motion.div
                     key={key}
@@ -373,7 +465,23 @@ export default function StudentFeesPage() {
                           {cfg.label}
                         </Badge>
                       </div>
-                      {status !== "Paid" && (
+                      {status === "Paid" && monthPayment && studentRecord ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs px-3 h-auto py-1 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+                          onClick={() =>
+                            setReceiptModal({
+                              payment: monthPayment,
+                              student: studentRecord,
+                            })
+                          }
+                          data-ocid={`student-fees.receipt_button.${key}`}
+                        >
+                          <Receipt className="w-3 h-3 mr-1" />
+                          Receipt
+                        </Button>
+                      ) : status !== "Paid" ? (
                         <Button
                           size="sm"
                           className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 h-auto"
@@ -389,7 +497,7 @@ export default function StudentFeesPage() {
                           <CreditCard className="w-3 h-3 mr-1" />
                           Pay Now
                         </Button>
-                      )}
+                      ) : null}
                     </div>
                   </motion.div>
                 );
@@ -411,6 +519,14 @@ export default function StudentFeesPage() {
             queryClient.invalidateQueries({ queryKey: ["payments"] });
             setPayModal(null);
           }}
+        />
+      )}
+      {receiptModal && (
+        <ReceiptModal
+          isOpen={!!receiptModal}
+          onClose={() => setReceiptModal(null)}
+          payment={receiptModal.payment}
+          student={receiptModal.student}
         />
       )}
     </PageTransition>

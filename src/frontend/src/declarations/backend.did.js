@@ -28,6 +28,17 @@ export const Admin = IDL.Record({
   'address' : IDL.Opt(IDL.Text),
   'profile_id' : UserId,
 });
+export const CreateClassForm = IDL.Record({
+  'name' : IDL.Text,
+  'description' : IDL.Text,
+});
+export const ClassRecord = IDL.Record({
+  'id' : IDL.Text,
+  'admin_id' : UserId,
+  'name' : IDL.Text,
+  'description' : IDL.Text,
+  'created_at' : Timestamp,
+});
 export const NotificationType = IDL.Variant({
   'custom' : IDL.Null,
   'fee_due' : IDL.Null,
@@ -69,29 +80,58 @@ export const Profile = IDL.Record({
   'is_active' : IDL.Bool,
   'phone' : IDL.Opt(IDL.Text),
 });
+export const CreateSectionForm = IDL.Record({
+  'name' : IDL.Text,
+  'class_id' : IDL.Text,
+});
+export const SectionRecord = IDL.Record({
+  'id' : IDL.Text,
+  'admin_id' : UserId,
+  'name' : IDL.Text,
+  'created_at' : Timestamp,
+  'class_id' : IDL.Text,
+});
 export const CreateStudentRequest = IDL.Record({
+  'dob' : IDL.Opt(IDL.Text),
   'joined_date' : Timestamp,
   'class' : IDL.Text,
   'name' : IDL.Text,
   'fee_start_date' : Timestamp,
+  'section' : IDL.Opt(IDL.Text),
+  'admission_date' : IDL.Opt(IDL.Text),
   'email' : IDL.Text,
+  'enrollment_number' : IDL.Opt(IDL.Text),
+  'parent_phone' : IDL.Opt(IDL.Text),
+  'address' : IDL.Opt(IDL.Text),
+  'gender' : IDL.Opt(IDL.Text),
+  'phone' : IDL.Opt(IDL.Text),
   'monthly_fee' : IDL.Nat,
   'course' : IDL.Text,
+  'parent_name' : IDL.Opt(IDL.Text),
 });
 export const Student = IDL.Record({
   'id' : IDL.Text,
+  'dob' : IDL.Opt(IDL.Text),
   'updated_at' : Timestamp,
   'joined_date' : Timestamp,
   'admin_id' : UserId,
   'class' : IDL.Text,
   'name' : IDL.Text,
   'fee_start_date' : Timestamp,
+  'section' : IDL.Opt(IDL.Text),
   'created_at' : Timestamp,
+  'admission_date' : IDL.Opt(IDL.Text),
   'email' : IDL.Text,
+  'enrollment_number' : IDL.Opt(IDL.Text),
+  'parent_phone' : IDL.Opt(IDL.Text),
+  'address' : IDL.Opt(IDL.Text),
+  'gender' : IDL.Opt(IDL.Text),
   'is_active' : IDL.Bool,
+  'phone' : IDL.Opt(IDL.Text),
   'monthly_fee' : IDL.Nat,
   'course' : IDL.Text,
   'profile_id' : IDL.Opt(UserId),
+  'parent_name' : IDL.Opt(IDL.Text),
 });
 export const PaymentMethod = IDL.Variant({
   'card' : IDL.Null,
@@ -118,6 +158,10 @@ export const RecordPaymentRequest = IDL.Record({
   'amount_paid' : IDL.Nat,
   'notes' : IDL.Opt(IDL.Text),
 });
+export const UpdateClassForm = IDL.Record({
+  'name' : IDL.Text,
+  'description' : IDL.Text,
+});
 export const UpdatePaymentRequest = IDL.Record({
   'payment_date' : IDL.Opt(Timestamp),
   'payment_method' : IDL.Opt(PaymentMethod),
@@ -132,28 +176,42 @@ export const UpdateProfileRequest = IDL.Record({
   'phone' : IDL.Opt(IDL.Text),
 });
 export const UpdateStudentRequest = IDL.Record({
+  'dob' : IDL.Opt(IDL.Text),
   'class' : IDL.Opt(IDL.Text),
   'name' : IDL.Opt(IDL.Text),
+  'section' : IDL.Opt(IDL.Text),
+  'admission_date' : IDL.Opt(IDL.Text),
   'email' : IDL.Opt(IDL.Text),
+  'enrollment_number' : IDL.Opt(IDL.Text),
+  'parent_phone' : IDL.Opt(IDL.Text),
+  'address' : IDL.Opt(IDL.Text),
+  'gender' : IDL.Opt(IDL.Text),
   'is_active' : IDL.Opt(IDL.Bool),
+  'phone' : IDL.Opt(IDL.Text),
   'monthly_fee' : IDL.Opt(IDL.Nat),
   'course' : IDL.Opt(IDL.Text),
+  'parent_name' : IDL.Opt(IDL.Text),
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControl' : IDL.Func([], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createAdmin' : IDL.Func([CreateAdminRequest], [Admin], []),
+  'createClass' : IDL.Func([CreateClassForm], [ClassRecord], []),
   'createNotification' : IDL.Func(
       [CreateNotificationRequest],
       [Notification],
       [],
     ),
   'createProfile' : IDL.Func([CreateProfileRequest], [Profile], []),
+  'createSection' : IDL.Func([CreateSectionForm], [SectionRecord], []),
   'createStudent' : IDL.Func([CreateStudentRequest], [Student], []),
+  'deleteClass' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'deletePayment' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'deleteSection' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'getAdminByProfile' : IDL.Func([], [IDL.Opt(Admin)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getClassesByAdmin' : IDL.Func([], [IDL.Vec(ClassRecord)], ['query']),
   'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
   'getNotificationsByAdmin' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getNotificationsByStudent' : IDL.Func(
@@ -163,12 +221,23 @@ export const idlService = IDL.Service({
     ),
   'getPaymentsByAdmin' : IDL.Func([], [IDL.Vec(MonthlyPayment)], ['query']),
   'getPaymentsByStudent' : IDL.Func([], [IDL.Vec(MonthlyPayment)], ['query']),
+  'getSectionsByAdmin' : IDL.Func([], [IDL.Vec(SectionRecord)], ['query']),
+  'getSectionsByClass' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(SectionRecord)],
+      ['query'],
+    ),
   'getStudentByProfile' : IDL.Func([], [IDL.Opt(Student)], ['query']),
   'getStudentsByAdmin' : IDL.Func([], [IDL.Vec(Student)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'markAllNotificationsRead' : IDL.Func([], [IDL.Nat], []),
   'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'recordPayment' : IDL.Func([RecordPaymentRequest], [MonthlyPayment], []),
+  'updateClass' : IDL.Func(
+      [IDL.Text, UpdateClassForm],
+      [IDL.Opt(ClassRecord)],
+      [],
+    ),
   'updatePayment' : IDL.Func(
       [IDL.Text, UpdatePaymentRequest],
       [IDL.Opt(MonthlyPayment)],
@@ -204,6 +273,17 @@ export const idlFactory = ({ IDL }) => {
     'institute_name' : IDL.Text,
     'address' : IDL.Opt(IDL.Text),
     'profile_id' : UserId,
+  });
+  const CreateClassForm = IDL.Record({
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+  });
+  const ClassRecord = IDL.Record({
+    'id' : IDL.Text,
+    'admin_id' : UserId,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'created_at' : Timestamp,
   });
   const NotificationType = IDL.Variant({
     'custom' : IDL.Null,
@@ -246,29 +326,58 @@ export const idlFactory = ({ IDL }) => {
     'is_active' : IDL.Bool,
     'phone' : IDL.Opt(IDL.Text),
   });
+  const CreateSectionForm = IDL.Record({
+    'name' : IDL.Text,
+    'class_id' : IDL.Text,
+  });
+  const SectionRecord = IDL.Record({
+    'id' : IDL.Text,
+    'admin_id' : UserId,
+    'name' : IDL.Text,
+    'created_at' : Timestamp,
+    'class_id' : IDL.Text,
+  });
   const CreateStudentRequest = IDL.Record({
+    'dob' : IDL.Opt(IDL.Text),
     'joined_date' : Timestamp,
     'class' : IDL.Text,
     'name' : IDL.Text,
     'fee_start_date' : Timestamp,
+    'section' : IDL.Opt(IDL.Text),
+    'admission_date' : IDL.Opt(IDL.Text),
     'email' : IDL.Text,
+    'enrollment_number' : IDL.Opt(IDL.Text),
+    'parent_phone' : IDL.Opt(IDL.Text),
+    'address' : IDL.Opt(IDL.Text),
+    'gender' : IDL.Opt(IDL.Text),
+    'phone' : IDL.Opt(IDL.Text),
     'monthly_fee' : IDL.Nat,
     'course' : IDL.Text,
+    'parent_name' : IDL.Opt(IDL.Text),
   });
   const Student = IDL.Record({
     'id' : IDL.Text,
+    'dob' : IDL.Opt(IDL.Text),
     'updated_at' : Timestamp,
     'joined_date' : Timestamp,
     'admin_id' : UserId,
     'class' : IDL.Text,
     'name' : IDL.Text,
     'fee_start_date' : Timestamp,
+    'section' : IDL.Opt(IDL.Text),
     'created_at' : Timestamp,
+    'admission_date' : IDL.Opt(IDL.Text),
     'email' : IDL.Text,
+    'enrollment_number' : IDL.Opt(IDL.Text),
+    'parent_phone' : IDL.Opt(IDL.Text),
+    'address' : IDL.Opt(IDL.Text),
+    'gender' : IDL.Opt(IDL.Text),
     'is_active' : IDL.Bool,
+    'phone' : IDL.Opt(IDL.Text),
     'monthly_fee' : IDL.Nat,
     'course' : IDL.Text,
     'profile_id' : IDL.Opt(UserId),
+    'parent_name' : IDL.Opt(IDL.Text),
   });
   const PaymentMethod = IDL.Variant({
     'card' : IDL.Null,
@@ -295,6 +404,10 @@ export const idlFactory = ({ IDL }) => {
     'amount_paid' : IDL.Nat,
     'notes' : IDL.Opt(IDL.Text),
   });
+  const UpdateClassForm = IDL.Record({
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+  });
   const UpdatePaymentRequest = IDL.Record({
     'payment_date' : IDL.Opt(Timestamp),
     'payment_method' : IDL.Opt(PaymentMethod),
@@ -309,28 +422,42 @@ export const idlFactory = ({ IDL }) => {
     'phone' : IDL.Opt(IDL.Text),
   });
   const UpdateStudentRequest = IDL.Record({
+    'dob' : IDL.Opt(IDL.Text),
     'class' : IDL.Opt(IDL.Text),
     'name' : IDL.Opt(IDL.Text),
+    'section' : IDL.Opt(IDL.Text),
+    'admission_date' : IDL.Opt(IDL.Text),
     'email' : IDL.Opt(IDL.Text),
+    'enrollment_number' : IDL.Opt(IDL.Text),
+    'parent_phone' : IDL.Opt(IDL.Text),
+    'address' : IDL.Opt(IDL.Text),
+    'gender' : IDL.Opt(IDL.Text),
     'is_active' : IDL.Opt(IDL.Bool),
+    'phone' : IDL.Opt(IDL.Text),
     'monthly_fee' : IDL.Opt(IDL.Nat),
     'course' : IDL.Opt(IDL.Text),
+    'parent_name' : IDL.Opt(IDL.Text),
   });
   
   return IDL.Service({
     '_initializeAccessControl' : IDL.Func([], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createAdmin' : IDL.Func([CreateAdminRequest], [Admin], []),
+    'createClass' : IDL.Func([CreateClassForm], [ClassRecord], []),
     'createNotification' : IDL.Func(
         [CreateNotificationRequest],
         [Notification],
         [],
       ),
     'createProfile' : IDL.Func([CreateProfileRequest], [Profile], []),
+    'createSection' : IDL.Func([CreateSectionForm], [SectionRecord], []),
     'createStudent' : IDL.Func([CreateStudentRequest], [Student], []),
+    'deleteClass' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'deletePayment' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'deleteSection' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'getAdminByProfile' : IDL.Func([], [IDL.Opt(Admin)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getClassesByAdmin' : IDL.Func([], [IDL.Vec(ClassRecord)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
     'getNotificationsByAdmin' : IDL.Func(
         [],
@@ -344,12 +471,23 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getPaymentsByAdmin' : IDL.Func([], [IDL.Vec(MonthlyPayment)], ['query']),
     'getPaymentsByStudent' : IDL.Func([], [IDL.Vec(MonthlyPayment)], ['query']),
+    'getSectionsByAdmin' : IDL.Func([], [IDL.Vec(SectionRecord)], ['query']),
+    'getSectionsByClass' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(SectionRecord)],
+        ['query'],
+      ),
     'getStudentByProfile' : IDL.Func([], [IDL.Opt(Student)], ['query']),
     'getStudentsByAdmin' : IDL.Func([], [IDL.Vec(Student)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'markAllNotificationsRead' : IDL.Func([], [IDL.Nat], []),
     'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'recordPayment' : IDL.Func([RecordPaymentRequest], [MonthlyPayment], []),
+    'updateClass' : IDL.Func(
+        [IDL.Text, UpdateClassForm],
+        [IDL.Opt(ClassRecord)],
+        [],
+      ),
     'updatePayment' : IDL.Func(
         [IDL.Text, UpdatePaymentRequest],
         [IDL.Opt(MonthlyPayment)],

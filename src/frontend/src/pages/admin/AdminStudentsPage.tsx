@@ -3,6 +3,13 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { PageTransition } from "@/components/shared/PageTransition";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,8 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { usePaymentsByStudent } from "@/hooks/usePayments";
 import {
   useAddStudent,
@@ -26,14 +35,22 @@ import type {
   Student,
   UpdateStudentForm,
 } from "@/types/student";
+import {
+  COURSE_OPTIONS,
+  GENDER_OPTIONS,
+  SECTION_OPTIONS,
+} from "@/types/student";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Edit2,
   Eye,
   IndianRupee,
   Plus,
+  RefreshCw,
   Search,
   SortAsc,
   SortDesc,
@@ -75,6 +92,112 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+function generateEnrollmentCode(firstName: string): string {
+  const clean = firstName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4)
+    .padEnd(4, "X");
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  return `AC-${clean}${digits}`;
+}
+
+/* ---------- Student Created Credentials Modal ---------- */
+function CredentialsModal({
+  open,
+  onClose,
+  studentName,
+  email,
+  enrollmentCode,
+}: {
+  open: boolean;
+  onClose: () => void;
+  studentName: string;
+  email: string;
+  enrollmentCode: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  function copyCode() {
+    navigator.clipboard.writeText(enrollmentCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success("Enrollment code copied!");
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md" data-ocid="credentials.dialog">
+        <div className="flex flex-col items-center text-center pt-2 pb-4 space-y-5">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", damping: 16, stiffness: 300 }}
+            className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center"
+          >
+            <Check className="w-8 h-8 text-emerald-500" />
+          </motion.div>
+
+          <div className="space-y-1">
+            <h3 className="font-display text-xl font-bold text-foreground">
+              Student Created!
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{studentName}</span>{" "}
+              has been added to the system.
+            </p>
+            <p className="text-xs text-muted-foreground">{email}</p>
+          </div>
+
+          <div className="w-full bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Enrollment Code
+            </p>
+            <p
+              className="font-display text-3xl font-bold text-primary tracking-widest"
+              data-ocid="credentials.enrollment_code"
+            >
+              {enrollmentCode}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Share this code with the student so they can log in to the portal.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
+              onClick={copyCode}
+              data-ocid="credentials.copy_button"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" /> Copy Code
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="pt-0 pb-2">
+          <Button
+            type="button"
+            className="w-full gradient-accent text-primary-foreground"
+            onClick={onClose}
+            data-ocid="credentials.done_button"
+          >
+            Done
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ---------- Student Details Modal ---------- */
 function StudentDetailsModal({
   student,
@@ -94,155 +217,168 @@ function StudentDetailsModal({
     : 0;
 
   return (
-    <AnimatePresence>
-      {open && student && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 24 }}
-            transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="fixed inset-x-4 top-10 bottom-10 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-14 sm:bottom-auto sm:w-full sm:max-w-lg z-50 flex flex-col"
-            data-ocid="student_details.dialog"
-          >
-            <div className="glass-card rounded-2xl shadow-elevated flex flex-col h-full sm:h-auto max-h-[calc(100vh-6rem)] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-5 border-b border-border/30">
-                <h2 className="font-display font-semibold text-xl text-foreground">
-                  Student Details
-                </h2>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-fast"
-                  data-ocid="student_details.close_button"
-                  aria-label="Close"
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent
+        className="sm:max-w-lg max-h-[90vh] overflow-y-auto"
+        data-ocid="student_details.dialog"
+      >
+        {student && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Student Details</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 pb-2">
+              {/* Avatar + Name */}
+              <div className="flex items-center gap-4">
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white shrink-0 bg-gradient-to-br ${avatarColor(student.name)}`}
                 >
-                  <X className="w-4 h-4" />
-                </button>
+                  {getInitials(student.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-display text-xl font-bold text-foreground">
+                    {student.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {student.email}
+                  </p>
+                  {student.enrollmentNumber && (
+                    <p className="text-xs text-primary font-mono font-medium mt-0.5">
+                      {student.enrollmentNumber}
+                    </p>
+                  )}
+                </div>
+                <Badge
+                  className={`shrink-0 ${
+                    student.is_active
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                  variant={student.is_active ? "default" : "secondary"}
+                >
+                  {student.is_active ? "Active" : "Inactive"}
+                </Badge>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                {/* Avatar + Name */}
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white shrink-0 bg-gradient-to-br ${avatarColor(student.name)}`}
-                  >
-                    {getInitials(student.name)}
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["Class", student.class_],
+                    ["Course", student.course],
+                    ["Section", student.section || "—"],
+                    ["Gender", student.gender || "—"],
+                    ["Monthly Fee", formatCurrency(student.monthly_fee)],
+                    ["Joined", formatDate(student.joined_date)],
+                    ["Fee Start", formatDate(student.fee_start_date)],
+                    ["Phone", student.phone || "—"],
+                    ["Parent", student.parentName || "—"],
+                    ["Parent Phone", student.parentPhone || "—"],
+                  ] as [string, string][]
+                ).map(([label, value]) => (
+                  <div key={label} className="bg-muted/30 rounded-xl p-3">
+                    <p className="text-xs text-muted-foreground mb-0.5">
+                      {label}
+                    </p>
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Payment Summary */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+                <p className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <IndianRupee className="w-3.5 h-3.5 text-primary" /> Payment
+                  Summary
+                </p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="font-display text-lg font-bold text-primary">
+                      {formatCurrency(totalPaid)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Total Paid</p>
                   </div>
                   <div>
-                    <p className="font-display text-xl font-bold text-foreground">
-                      {student.name}
+                    <p className="font-display text-lg font-bold text-amber-500">
+                      {formatCurrency(pendingBalance)}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      {student.email}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Pending</p>
                   </div>
-                  <Badge
-                    className={`ml-auto ${student.is_active ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" : "bg-muted text-muted-foreground"}`}
-                    variant={student.is_active ? "default" : "secondary"}
-                  >
-                    {student.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-
-                {/* Info Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  {(
-                    [
-                      ["Class", student.class_],
-                      ["Course", student.course],
-                      ["Monthly Fee", formatCurrency(student.monthly_fee)],
-                      ["Joined", formatDate(student.joined_date)],
-                      ["Fee Start", formatDate(student.fee_start_date)],
-                      ["Enrolled On", formatDate(student.created_at)],
-                    ] as [string, string][]
-                  ).map(([label, value]) => (
-                    <div key={label} className="bg-muted/30 rounded-xl p-3">
-                      <p className="text-xs text-muted-foreground mb-0.5">
-                        {label}
-                      </p>
-                      <p className="text-sm font-medium text-foreground">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Payment Summary */}
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                  <p className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
-                    <IndianRupee className="w-3.5 h-3.5 text-primary" /> Payment
-                    Summary
-                  </p>
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div>
-                      <p className="font-display text-lg font-bold text-primary">
-                        {formatCurrency(totalPaid)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Total Paid
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-display text-lg font-bold text-amber-500">
-                        {formatCurrency(pendingBalance)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Pending</p>
-                    </div>
-                    <div>
-                      <p className="font-display text-lg font-bold text-foreground">
-                        {payments.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Payments</p>
-                    </div>
+                  <div>
+                    <p className="font-display text-lg font-bold text-foreground">
+                      {payments.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Payments</p>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-3 px-6 py-4 border-t border-border/30">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={onClose}
-                  data-ocid="student_details.cancel_button"
-                >
-                  Close
-                </Button>
-                <Button
-                  className="flex-1 gradient-accent text-primary-foreground"
-                  onClick={() => {
-                    onClose();
-                    onEdit();
-                  }}
-                  data-ocid="student_details.edit_button"
-                >
-                  <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Edit Student
-                </Button>
               </div>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={onClose}
+                data-ocid="student_details.cancel_button"
+              >
+                Close
+              </Button>
+              <Button
+                className="flex-1 gradient-accent text-primary-foreground"
+                onClick={() => {
+                  onClose();
+                  onEdit();
+                }}
+                data-ocid="student_details.edit_button"
+              >
+                <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Edit Student
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
-/* ---------- Add / Edit Student Modal ---------- */
+/* ---------- Form Section Heading ---------- */
+function FormSection({
+  title,
+  subtitle,
+}: { title: string; subtitle?: string }) {
+  return (
+    <div className="pt-4 pb-1">
+      <p className="font-display font-semibold text-sm text-foreground">
+        {title}
+      </p>
+      {subtitle && (
+        <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+      )}
+      <Separator className="mt-2" />
+    </div>
+  );
+}
+
+/* ---------- Add / Edit Student Dialog ---------- */
 interface StudentModalProps {
   open: boolean;
   student?: Student | null;
   onClose: () => void;
+  onCreated?: (name: string, email: string, code: string) => void;
 }
 
-function StudentModal({ open, student, onClose }: StudentModalProps) {
+function StudentModal({
+  open,
+  student,
+  onClose,
+  onCreated,
+}: StudentModalProps) {
   const isEdit = !!student;
   const addMutation = useAddStudent();
   const updateMutation = useUpdateStudent();
+
+  const today = new Date().toISOString().split("T")[0];
 
   const defaultForm: CreateStudentForm = {
     name: "",
@@ -250,17 +386,25 @@ function StudentModal({ open, student, onClose }: StudentModalProps) {
     class_: "",
     course: "",
     monthly_fee: 0,
-    joined_date: new Date().toISOString().split("T")[0],
-    fee_start_date: new Date().toISOString().split("T")[0],
+    joined_date: today,
+    fee_start_date: today,
+    phone: "",
+    gender: "",
+    dob: "",
+    address: "",
+    parentName: "",
+    parentPhone: "",
+    section: "",
+    enrollmentNumber: "",
+    admissionDate: today,
   };
 
   const [form, setForm] = useState<CreateStudentForm>(defaultForm);
-  const [errors, setErrors] = useState<
-    Partial<Record<keyof CreateStudentForm, string>>
-  >({});
+  const [isActive, setIsActive] = useState<boolean>(true);
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: defaultForm is stable inline literal
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on open
   useEffect(() => {
     if (!open) return;
     if (student) {
@@ -272,16 +416,48 @@ function StudentModal({ open, student, onClose }: StudentModalProps) {
         monthly_fee: student.monthly_fee,
         joined_date: student.joined_date,
         fee_start_date: student.fee_start_date,
+        phone: student.phone ?? "",
+        gender: student.gender ?? "",
+        dob: student.dob ?? "",
+        address: student.address ?? "",
+        parentName: student.parentName ?? "",
+        parentPhone: student.parentPhone ?? "",
+        section: student.section ?? "",
+        enrollmentNumber: student.enrollmentNumber ?? "",
+        admissionDate: student.admissionDate ?? today,
       });
+      setIsActive(student.is_active);
     } else {
-      setForm(defaultForm);
+      setForm({
+        ...defaultForm,
+        enrollmentNumber: generateEnrollmentCode("New"),
+      });
+      setIsActive(true);
     }
     setErrors({});
     setTimeout(() => firstInputRef.current?.focus(), 80);
   }, [open, student]);
 
+  // Auto-regenerate enrollment code when name changes (new student only)
+  function handleNameChange(val: string) {
+    setForm((prev) => ({
+      ...prev,
+      name: val,
+      enrollmentNumber:
+        !isEdit && prev.enrollmentNumber
+          ? generateEnrollmentCode(val || "New")
+          : prev.enrollmentNumber,
+    }));
+    if (errors.name) setErrors((e) => ({ ...e, name: undefined }));
+  }
+
+  function handlePhoneInput(val: string, field: "phone" | "parentPhone") {
+    const digits = val.replace(/\D/g, "").slice(0, 10);
+    setForm((prev) => ({ ...prev, [field]: digits }));
+  }
+
   function validate(): boolean {
-    const e: Partial<Record<keyof CreateStudentForm, string>> = {};
+    const e: Partial<Record<string, string>> = {};
     if (!form.name.trim()) e.name = "Name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/^[^@]+@[^@]+\.[^@]+$/.test(form.email))
@@ -292,6 +468,10 @@ function StudentModal({ open, student, onClose }: StudentModalProps) {
       e.monthly_fee = "Fee must be > 0";
     if (!form.joined_date) e.joined_date = "Required";
     if (!form.fee_start_date) e.fee_start_date = "Required";
+    if (form.phone && form.phone.length !== 10)
+      e.phone = "Enter 10-digit mobile number";
+    if (form.parentPhone && form.parentPhone.length !== 10)
+      e.parentPhone = "Enter 10-digit number";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -307,14 +487,26 @@ function StudentModal({ open, student, onClose }: StudentModalProps) {
           class_: form.class_,
           course: form.course,
           monthly_fee: form.monthly_fee,
+          phone: form.phone,
+          gender: form.gender,
+          dob: form.dob,
+          address: form.address,
+          parentName: form.parentName,
+          parentPhone: form.parentPhone,
+          section: form.section,
+          enrollmentNumber: form.enrollmentNumber,
+          admissionDate: form.admissionDate,
+          is_active: isActive,
         };
         await updateMutation.mutateAsync({ id: student.id, data: upd });
         toast.success("Student updated successfully!");
+        onClose();
       } else {
         await addMutation.mutateAsync(form);
-        toast.success("Student added successfully!");
+        const code = form.enrollmentNumber ?? "";
+        onClose();
+        onCreated?.(form.name, form.email, code);
       }
-      onClose();
     } catch {
       toast.error(
         isEdit ? "Failed to update student" : "Failed to add student",
@@ -329,227 +521,405 @@ function StudentModal({ open, student, onClose }: StudentModalProps) {
     value: CreateStudentForm[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
+    if (errors[key as string])
+      setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            onClick={onClose}
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent
+        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+        data-ocid="student_modal.dialog"
+      >
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">
+            {isEdit ? "Edit Student" : "Add New Student"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Update student details below."
+              : "Fill in the student information to create their account."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-1 pb-2">
+          {/* ── Section 1: Personal Info ── */}
+          <FormSection
+            title="Personal Information"
+            subtitle="Basic student identity details"
           />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 24 }}
-            transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="fixed inset-x-4 top-8 bottom-8 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-10 sm:bottom-auto sm:w-full sm:max-w-2xl z-50 flex flex-col"
-            data-ocid="student_modal.dialog"
-          >
-            <div className="glass-card rounded-2xl shadow-elevated flex flex-col h-full sm:h-auto max-h-[calc(100vh-5rem)] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-5 border-b border-border/30">
-                <div>
-                  <h2 className="font-display font-semibold text-xl text-foreground">
-                    {isEdit ? "Edit Student" : "Add New Student"}
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isEdit
-                      ? "Update student details"
-                      : "Fill in the student's information"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="text-muted-foreground hover:text-foreground transition-fast w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center"
-                  data-ocid="student_modal.close_button"
-                  aria-label="Close modal"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="s-name">
+                Full Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="s-name"
+                ref={firstInputRef}
+                placeholder="e.g. Priya Sharma"
+                value={form.name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                className={errors.name ? "border-destructive" : ""}
+                data-ocid="student_modal.name_input"
+              />
+              {errors.name && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="student_modal.name_error"
                 >
-                  <X className="w-4 h-4" />
-                </button>
+                  {errors.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-email">
+                Email <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="s-email"
+                type="email"
+                placeholder="student@email.com"
+                value={form.email}
+                onChange={(e) => field("email", e.target.value)}
+                className={errors.email ? "border-destructive" : ""}
+                data-ocid="student_modal.email_input"
+              />
+              {errors.email && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="student_modal.email_error"
+                >
+                  {errors.email}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-phone">Phone Number</Label>
+              <div className="flex">
+                <span className="flex items-center px-3 bg-muted/50 border border-r-0 border-input rounded-l-md text-sm text-muted-foreground">
+                  +91
+                </span>
+                <Input
+                  id="s-phone"
+                  placeholder="9876543210"
+                  value={form.phone ?? ""}
+                  onChange={(e) => handlePhoneInput(e.target.value, "phone")}
+                  className={`rounded-l-none ${
+                    errors.phone ? "border-destructive" : ""
+                  }`}
+                  maxLength={10}
+                  inputMode="numeric"
+                  data-ocid="student_modal.phone_input"
+                />
               </div>
-              <form
-                onSubmit={handleSubmit}
-                className="flex-1 overflow-y-auto px-6 py-5"
+              {errors.phone && (
+                <p className="text-xs text-destructive">{errors.phone}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-gender">Gender</Label>
+              <Select
+                value={form.gender ?? ""}
+                onValueChange={(v) => field("gender", v)}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="s-name">
-                      Full Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-name"
-                      ref={firstInputRef}
-                      placeholder="e.g. Priya Sharma"
-                      value={form.name}
-                      onChange={(e) => field("name", e.target.value)}
-                      className={errors.name ? "border-destructive" : ""}
-                      data-ocid="student_modal.name_input"
-                    />
-                    {errors.name && (
-                      <p
-                        className="text-xs text-destructive"
-                        data-ocid="student_modal.name_error"
-                      >
-                        {errors.name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="s-email">
-                      Email <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-email"
-                      type="email"
-                      placeholder="student@email.com"
-                      value={form.email}
-                      onChange={(e) => field("email", e.target.value)}
-                      className={errors.email ? "border-destructive" : ""}
-                      data-ocid="student_modal.email_input"
-                    />
-                    {errors.email && (
-                      <p
-                        className="text-xs text-destructive"
-                        data-ocid="student_modal.email_error"
-                      >
-                        {errors.email}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="s-class">
-                      Class <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-class"
-                      placeholder="e.g. Class 10"
-                      value={form.class_}
-                      onChange={(e) => field("class_", e.target.value)}
-                      className={errors.class_ ? "border-destructive" : ""}
-                      data-ocid="student_modal.class_input"
-                    />
-                    {errors.class_ && (
-                      <p className="text-xs text-destructive">
-                        {errors.class_}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="s-course">
-                      Course <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-course"
-                      placeholder="e.g. Mathematics"
-                      value={form.course}
-                      onChange={(e) => field("course", e.target.value)}
-                      className={errors.course ? "border-destructive" : ""}
-                      data-ocid="student_modal.course_input"
-                    />
-                    {errors.course && (
-                      <p className="text-xs text-destructive">
-                        {errors.course}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="s-fee">
-                      Monthly Fee (₹){" "}
-                      <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-fee"
-                      type="number"
-                      min={1}
-                      placeholder="e.g. 1500"
-                      value={form.monthly_fee || ""}
-                      onChange={(e) =>
-                        field("monthly_fee", Number(e.target.value))
-                      }
-                      className={errors.monthly_fee ? "border-destructive" : ""}
-                      data-ocid="student_modal.fee_input"
-                    />
-                    {errors.monthly_fee && (
-                      <p className="text-xs text-destructive">
-                        {errors.monthly_fee}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="s-joined">
-                      Joined Date <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-joined"
-                      type="date"
-                      value={form.joined_date}
-                      onChange={(e) => field("joined_date", e.target.value)}
-                      className={errors.joined_date ? "border-destructive" : ""}
-                      data-ocid="student_modal.joined_date_input"
-                    />
-                    {errors.joined_date && (
-                      <p className="text-xs text-destructive">
-                        {errors.joined_date}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor="s-fee-start">
-                      Fee Start Date <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="s-fee-start"
-                      type="date"
-                      value={form.fee_start_date}
-                      onChange={(e) => field("fee_start_date", e.target.value)}
-                      className={`${errors.fee_start_date ? "border-destructive" : ""} sm:max-w-xs`}
-                      data-ocid="student_modal.fee_start_date_input"
-                    />
-                    {errors.fee_start_date && (
-                      <p className="text-xs text-destructive">
-                        {errors.fee_start_date}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-8 pt-5 border-t border-border/30">
+                <SelectTrigger
+                  id="s-gender"
+                  data-ocid="student_modal.gender_select"
+                >
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENDER_OPTIONS.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-dob">Date of Birth</Label>
+              <Input
+                id="s-dob"
+                type="date"
+                value={form.dob ?? ""}
+                onChange={(e) => field("dob", e.target.value)}
+                data-ocid="student_modal.dob_input"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="s-address">Address</Label>
+              <Textarea
+                id="s-address"
+                placeholder="Full residential address"
+                value={form.address ?? ""}
+                onChange={(e) => field("address", e.target.value)}
+                className="resize-none min-h-[72px]"
+                data-ocid="student_modal.address_input"
+              />
+            </div>
+          </div>
+
+          {/* ── Section 2: Parent / Guardian ── */}
+          <FormSection
+            title="Parent / Guardian"
+            subtitle="Emergency and guardian contact information"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="s-parent-name">Parent / Guardian Name</Label>
+              <Input
+                id="s-parent-name"
+                placeholder="e.g. Ramesh Sharma"
+                value={form.parentName ?? ""}
+                onChange={(e) => field("parentName", e.target.value)}
+                data-ocid="student_modal.parent_name_input"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-parent-phone">Parent Phone</Label>
+              <div className="flex">
+                <span className="flex items-center px-3 bg-muted/50 border border-r-0 border-input rounded-l-md text-sm text-muted-foreground">
+                  +91
+                </span>
+                <Input
+                  id="s-parent-phone"
+                  placeholder="9876543210"
+                  value={form.parentPhone ?? ""}
+                  onChange={(e) =>
+                    handlePhoneInput(e.target.value, "parentPhone")
+                  }
+                  className={`rounded-l-none ${
+                    errors.parentPhone ? "border-destructive" : ""
+                  }`}
+                  maxLength={10}
+                  inputMode="numeric"
+                  data-ocid="student_modal.parent_phone_input"
+                />
+              </div>
+              {errors.parentPhone && (
+                <p className="text-xs text-destructive">{errors.parentPhone}</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Section 3: Academic Info ── */}
+          <FormSection
+            title="Academic Information"
+            subtitle="Course, class and enrollment details"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="s-course">
+                Course / Class <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={form.course}
+                onValueChange={(v) => {
+                  field("course", v);
+                  field("class_", v);
+                }}
+              >
+                <SelectTrigger
+                  id="s-course"
+                  className={errors.course ? "border-destructive" : ""}
+                  data-ocid="student_modal.course_select"
+                >
+                  <SelectValue placeholder="Select course" />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  {COURSE_OPTIONS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.course && (
+                <p className="text-xs text-destructive">{errors.course}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-section">Section</Label>
+              <Select
+                value={form.section ?? ""}
+                onValueChange={(v) => field("section", v)}
+              >
+                <SelectTrigger
+                  id="s-section"
+                  data-ocid="student_modal.section_select"
+                >
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECTION_OPTIONS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-enrollment">Enrollment Number</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="s-enrollment"
+                  value={form.enrollmentNumber ?? ""}
+                  readOnly
+                  className="flex-1 font-mono text-sm bg-muted/30"
+                  data-ocid="student_modal.enrollment_input"
+                />
+                {!isEdit && (
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1"
-                    onClick={onClose}
-                    disabled={isPending}
-                    data-ocid="student_modal.cancel_button"
+                    size="icon"
+                    onClick={() =>
+                      field(
+                        "enrollmentNumber",
+                        generateEnrollmentCode(form.name || "New"),
+                      )
+                    }
+                    title="Regenerate code"
+                    data-ocid="student_modal.regenerate_code_button"
                   >
-                    Cancel
+                    <RefreshCw className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 gradient-accent text-primary-foreground"
-                    disabled={isPending}
-                    data-ocid="student_modal.submit_button"
-                  >
-                    {isPending
-                      ? isEdit
-                        ? "Saving..."
-                        : "Adding..."
-                      : isEdit
-                        ? "Save Changes"
-                        : "Add Student"}
-                  </Button>
-                </div>
-              </form>
+                )}
+              </div>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-admission">Admission Date</Label>
+              <Input
+                id="s-admission"
+                type="date"
+                value={form.admissionDate ?? ""}
+                onChange={(e) => field("admissionDate", e.target.value)}
+                data-ocid="student_modal.admission_date_input"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-joined">
+                Joined Date <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="s-joined"
+                type="date"
+                value={form.joined_date}
+                onChange={(e) => field("joined_date", e.target.value)}
+                className={errors.joined_date ? "border-destructive" : ""}
+                data-ocid="student_modal.joined_date_input"
+              />
+              {errors.joined_date && (
+                <p className="text-xs text-destructive">{errors.joined_date}</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Section 4: Financial ── */}
+          <FormSection
+            title="Financial Details"
+            subtitle="Fee amount and billing period"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="s-fee">
+                Monthly Fee (₹) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="s-fee"
+                type="number"
+                min={1}
+                placeholder="e.g. 1500"
+                value={form.monthly_fee || ""}
+                onChange={(e) => field("monthly_fee", Number(e.target.value))}
+                className={errors.monthly_fee ? "border-destructive" : ""}
+                data-ocid="student_modal.fee_input"
+              />
+              {errors.monthly_fee && (
+                <p className="text-xs text-destructive">{errors.monthly_fee}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="s-fee-start">
+                Fee Start Date <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="s-fee-start"
+                type="date"
+                value={form.fee_start_date}
+                onChange={(e) => field("fee_start_date", e.target.value)}
+                className={errors.fee_start_date ? "border-destructive" : ""}
+                data-ocid="student_modal.fee_start_date_input"
+              />
+              {errors.fee_start_date && (
+                <p className="text-xs text-destructive">
+                  {errors.fee_start_date}
+                </p>
+              )}
+            </div>
+
+            {isEdit && (
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select
+                  value={isActive ? "Active" : "Inactive"}
+                  onValueChange={(v) => setIsActive(v === "Active")}
+                >
+                  <SelectTrigger data-ocid="student_modal.status_select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-3 pt-6 mt-2 border-t border-border/30">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={onClose}
+              disabled={isPending}
+              data-ocid="student_modal.cancel_button"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 gradient-accent text-primary-foreground"
+              disabled={isPending}
+              data-ocid="student_modal.submit_button"
+            >
+              {isPending
+                ? isEdit
+                  ? "Saving..."
+                  : "Adding..."
+                : isEdit
+                  ? "Save Changes"
+                  : "Add Student"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -571,7 +941,9 @@ function SortHeader({
     <button
       type="button"
       onClick={() => onSort(sortKey)}
-      className={`flex items-center gap-1 text-xs font-medium uppercase tracking-wide transition-fast ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+      className={`flex items-center gap-1 text-xs font-medium uppercase tracking-wide transition-fast ${
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+      }`}
     >
       {label}
       {active ? (
@@ -627,6 +999,12 @@ export function AdminStudentsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [toggleTarget, setToggleTarget] = useState<Student | null>(null);
   const [toggleConfirm, setToggleConfirm] = useState(false);
+  const [credentials, setCredentials] = useState<{
+    name: string;
+    email: string;
+    code: string;
+  } | null>(null);
+
   const updateMutation = useUpdateStudent();
   const deleteMutation = useDeleteStudent();
 
@@ -639,7 +1017,7 @@ export function AdminStudentsPage() {
     setPage(1);
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset page on filter change is intentional
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset page on filter change
   useEffect(() => {
     setPage(1);
   }, [search, filterStatus]);
@@ -879,7 +1257,11 @@ export function AdminStudentsPage() {
                     <p className="hidden md:block text-xs text-muted-foreground">
                       {new Date(student.joined_date).toLocaleDateString(
                         "en-IN",
-                        { day: "2-digit", month: "short", year: "numeric" },
+                        {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        },
                       )}
                     </p>
                     <div
@@ -900,7 +1282,11 @@ export function AdminStudentsPage() {
                       />
                       <Badge
                         variant={student.is_active ? "default" : "secondary"}
-                        className={`text-xs shrink-0 ${student.is_active ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground"}`}
+                        className={`text-xs shrink-0 ${
+                          student.is_active
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                            : "bg-muted text-muted-foreground"
+                        }`}
                       >
                         {student.is_active ? "Active" : "Inactive"}
                       </Badge>
@@ -965,7 +1351,11 @@ export function AdminStudentsPage() {
                         />
                         <Badge
                           variant={student.is_active ? "default" : "secondary"}
-                          className={`text-xs ${student.is_active ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : ""}`}
+                          className={`text-xs ${
+                            student.is_active
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                              : ""
+                          }`}
                         >
                           {student.is_active ? "Active" : "Inactive"}
                         </Badge>
@@ -1054,7 +1444,17 @@ export function AdminStudentsPage() {
           setModalOpen(false);
           setEditStudent(null);
         }}
+        onCreated={(name, email, code) => setCredentials({ name, email, code })}
       />
+      {credentials && (
+        <CredentialsModal
+          open={!!credentials}
+          studentName={credentials.name}
+          email={credentials.email}
+          enrollmentCode={credentials.code}
+          onClose={() => setCredentials(null)}
+        />
+      )}
       <ConfirmModal
         open={toggleConfirm}
         title="Deactivate Student?"

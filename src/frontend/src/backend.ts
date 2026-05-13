@@ -122,6 +122,13 @@ export interface CreateProfileRequest {
     email: string;
     phone?: string;
 }
+export interface ClassRecord {
+    id: string;
+    admin_id: UserId;
+    name: string;
+    description: string;
+    created_at: Timestamp;
+}
 export interface Profile {
     id: UserId;
     updated_at: Timestamp;
@@ -134,13 +141,30 @@ export interface Profile {
     phone?: string;
 }
 export interface CreateStudentRequest {
+    dob?: string;
     joined_date: Timestamp;
     class: string;
     name: string;
     fee_start_date: Timestamp;
+    section?: string;
+    admission_date?: string;
     email: string;
+    enrollment_number?: string;
+    parent_phone?: string;
+    address?: string;
+    gender?: string;
+    phone?: string;
     monthly_fee: bigint;
     course: string;
+    parent_name?: string;
+}
+export interface UpdateClassForm {
+    name: string;
+    description: string;
+}
+export interface CreateSectionForm {
+    name: string;
+    class_id: string;
 }
 export interface CreateAdminRequest {
     institute_code: string;
@@ -155,19 +179,18 @@ export interface UpdateProfileRequest {
     is_active?: boolean;
     phone?: string;
 }
+export interface SectionRecord {
+    id: string;
+    admin_id: UserId;
+    name: string;
+    created_at: Timestamp;
+    class_id: string;
+}
 export interface CreateNotificationRequest {
     title: string;
     type: NotificationType;
     student_id?: UserId;
     message: string;
-}
-export interface Admin {
-    id: UserId;
-    created_at: Timestamp;
-    institute_code: string;
-    institute_name: string;
-    address?: string;
-    profile_id: UserId;
 }
 export interface Notification {
     id: string;
@@ -179,28 +202,58 @@ export interface Notification {
     created_at: Timestamp;
     message: string;
 }
+export interface Admin {
+    id: UserId;
+    created_at: Timestamp;
+    institute_code: string;
+    institute_name: string;
+    address?: string;
+    profile_id: UserId;
+}
+export interface CreateClassForm {
+    name: string;
+    description: string;
+}
 export interface UpdateStudentRequest {
+    dob?: string;
     class?: string;
     name?: string;
+    section?: string;
+    admission_date?: string;
     email?: string;
+    enrollment_number?: string;
+    parent_phone?: string;
+    address?: string;
+    gender?: string;
     is_active?: boolean;
+    phone?: string;
     monthly_fee?: bigint;
     course?: string;
+    parent_name?: string;
 }
 export interface Student {
     id: string;
+    dob?: string;
     updated_at: Timestamp;
     joined_date: Timestamp;
     admin_id: UserId;
     class: string;
     name: string;
     fee_start_date: Timestamp;
+    section?: string;
     created_at: Timestamp;
+    admission_date?: string;
     email: string;
+    enrollment_number?: string;
+    parent_phone?: string;
+    address?: string;
+    gender?: string;
     is_active: boolean;
+    phone?: string;
     monthly_fee: bigint;
     course: string;
     profile_id?: UserId;
+    parent_name?: string;
 }
 export enum NotificationType {
     custom = "custom",
@@ -227,28 +280,36 @@ export interface backendInterface {
     _initializeAccessControl(): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createAdmin(req: CreateAdminRequest): Promise<Admin>;
+    createClass(form: CreateClassForm): Promise<ClassRecord>;
     createNotification(req: CreateNotificationRequest): Promise<Notification>;
     createProfile(req: CreateProfileRequest): Promise<Profile>;
+    createSection(form: CreateSectionForm): Promise<SectionRecord>;
     createStudent(req: CreateStudentRequest): Promise<Student>;
+    deleteClass(classId: string): Promise<boolean>;
     deletePayment(paymentId: string): Promise<boolean>;
+    deleteSection(sectionId: string): Promise<boolean>;
     getAdminByProfile(): Promise<Admin | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getClassesByAdmin(): Promise<Array<ClassRecord>>;
     getMyProfile(): Promise<Profile | null>;
     getNotificationsByAdmin(): Promise<Array<Notification>>;
     getNotificationsByStudent(): Promise<Array<Notification>>;
     getPaymentsByAdmin(): Promise<Array<MonthlyPayment>>;
     getPaymentsByStudent(): Promise<Array<MonthlyPayment>>;
+    getSectionsByAdmin(): Promise<Array<SectionRecord>>;
+    getSectionsByClass(classId: string): Promise<Array<SectionRecord>>;
     getStudentByProfile(): Promise<Student | null>;
     getStudentsByAdmin(): Promise<Array<Student>>;
     isCallerAdmin(): Promise<boolean>;
     markAllNotificationsRead(): Promise<bigint>;
     markNotificationRead(notifId: string): Promise<boolean>;
     recordPayment(req: RecordPaymentRequest): Promise<MonthlyPayment>;
+    updateClass(classId: string, form: UpdateClassForm): Promise<ClassRecord | null>;
     updatePayment(paymentId: string, req: UpdatePaymentRequest): Promise<MonthlyPayment | null>;
     updateProfile(req: UpdateProfileRequest): Promise<Profile | null>;
     updateStudent(studentId: string, req: UpdateStudentRequest): Promise<Student | null>;
 }
-import type { Admin as _Admin, CreateAdminRequest as _CreateAdminRequest, CreateNotificationRequest as _CreateNotificationRequest, CreateProfileRequest as _CreateProfileRequest, MonthlyPayment as _MonthlyPayment, Notification as _Notification, NotificationType as _NotificationType, PaymentMethod as _PaymentMethod, Profile as _Profile, RecordPaymentRequest as _RecordPaymentRequest, Role as _Role, Student as _Student, Timestamp as _Timestamp, UpdatePaymentRequest as _UpdatePaymentRequest, UpdateProfileRequest as _UpdateProfileRequest, UpdateStudentRequest as _UpdateStudentRequest, UserId as _UserId, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { Admin as _Admin, ClassRecord as _ClassRecord, CreateAdminRequest as _CreateAdminRequest, CreateNotificationRequest as _CreateNotificationRequest, CreateProfileRequest as _CreateProfileRequest, CreateStudentRequest as _CreateStudentRequest, MonthlyPayment as _MonthlyPayment, Notification as _Notification, NotificationType as _NotificationType, PaymentMethod as _PaymentMethod, Profile as _Profile, RecordPaymentRequest as _RecordPaymentRequest, Role as _Role, Student as _Student, Timestamp as _Timestamp, UpdatePaymentRequest as _UpdatePaymentRequest, UpdateProfileRequest as _UpdateProfileRequest, UpdateStudentRequest as _UpdateStudentRequest, UserId as _UserId, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControl(): Promise<void> {
@@ -293,6 +354,20 @@ export class Backend implements backendInterface {
             return from_candid_Admin_n5(this._uploadFile, this._downloadFile, result);
         }
     }
+    async createClass(arg0: CreateClassForm): Promise<ClassRecord> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createClass(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createClass(arg0);
+            return result;
+        }
+    }
     async createNotification(arg0: CreateNotificationRequest): Promise<Notification> {
         if (this.processError) {
             try {
@@ -321,18 +396,46 @@ export class Backend implements backendInterface {
             return from_candid_Profile_n21(this._uploadFile, this._downloadFile, result);
         }
     }
-    async createStudent(arg0: CreateStudentRequest): Promise<Student> {
+    async createSection(arg0: CreateSectionForm): Promise<SectionRecord> {
         if (this.processError) {
             try {
-                const result = await this.actor.createStudent(arg0);
-                return from_candid_Student_n25(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.createSection(arg0);
+                return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createStudent(arg0);
-            return from_candid_Student_n25(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.createSection(arg0);
+            return result;
+        }
+    }
+    async createStudent(arg0: CreateStudentRequest): Promise<Student> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createStudent(to_candid_CreateStudentRequest_n25(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_Student_n27(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createStudent(to_candid_CreateStudentRequest_n25(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_Student_n27(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async deleteClass(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteClass(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteClass(arg0);
+            return result;
         }
     }
     async deletePayment(arg0: string): Promise<boolean> {
@@ -349,130 +452,186 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteSection(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteSection(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteSection(arg0);
+            return result;
+        }
+    }
     async getAdminByProfile(): Promise<Admin | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getAdminByProfile();
-                return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n29(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getAdminByProfile();
-            return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n29(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserRole(): Promise<UserRole> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserRole();
-                return from_candid_UserRole_n28(this._uploadFile, this._downloadFile, result);
+                return from_candid_UserRole_n30(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserRole();
-            return from_candid_UserRole_n28(this._uploadFile, this._downloadFile, result);
+            return from_candid_UserRole_n30(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getClassesByAdmin(): Promise<Array<ClassRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getClassesByAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getClassesByAdmin();
+            return result;
         }
     }
     async getMyProfile(): Promise<Profile | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getMyProfile();
-                return from_candid_opt_n30(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n32(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getMyProfile();
-            return from_candid_opt_n30(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n32(this._uploadFile, this._downloadFile, result);
         }
     }
     async getNotificationsByAdmin(): Promise<Array<Notification>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getNotificationsByAdmin();
-                return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n33(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getNotificationsByAdmin();
-            return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n33(this._uploadFile, this._downloadFile, result);
         }
     }
     async getNotificationsByStudent(): Promise<Array<Notification>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getNotificationsByStudent();
-                return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n33(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getNotificationsByStudent();
-            return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n33(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPaymentsByAdmin(): Promise<Array<MonthlyPayment>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getPaymentsByAdmin();
-                return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getPaymentsByAdmin();
-            return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPaymentsByStudent(): Promise<Array<MonthlyPayment>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getPaymentsByStudent();
-                return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getPaymentsByStudent();
-            return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n34(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getSectionsByAdmin(): Promise<Array<SectionRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSectionsByAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSectionsByAdmin();
+            return result;
+        }
+    }
+    async getSectionsByClass(arg0: string): Promise<Array<SectionRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSectionsByClass(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSectionsByClass(arg0);
+            return result;
         }
     }
     async getStudentByProfile(): Promise<Student | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getStudentByProfile();
-                return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n39(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getStudentByProfile();
-            return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n39(this._uploadFile, this._downloadFile, result);
         }
     }
     async getStudentsByAdmin(): Promise<Array<Student>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getStudentsByAdmin();
-                return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getStudentsByAdmin();
-            return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
         }
     }
     async isCallerAdmin(): Promise<boolean> {
@@ -520,65 +679,79 @@ export class Backend implements backendInterface {
     async recordPayment(arg0: RecordPaymentRequest): Promise<MonthlyPayment> {
         if (this.processError) {
             try {
-                const result = await this.actor.recordPayment(to_candid_RecordPaymentRequest_n39(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_MonthlyPayment_n33(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.recordPayment(to_candid_RecordPaymentRequest_n41(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_MonthlyPayment_n35(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.recordPayment(to_candid_RecordPaymentRequest_n39(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_MonthlyPayment_n33(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.recordPayment(to_candid_RecordPaymentRequest_n41(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_MonthlyPayment_n35(this._uploadFile, this._downloadFile, result);
         }
     }
-    async updatePayment(arg0: string, arg1: UpdatePaymentRequest): Promise<MonthlyPayment | null> {
+    async updateClass(arg0: string, arg1: UpdateClassForm): Promise<ClassRecord | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.updatePayment(arg0, to_candid_UpdatePaymentRequest_n43(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.updateClass(arg0, arg1);
                 return from_candid_opt_n45(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updatePayment(arg0, to_candid_UpdatePaymentRequest_n43(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.updateClass(arg0, arg1);
             return from_candid_opt_n45(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async updatePayment(arg0: string, arg1: UpdatePaymentRequest): Promise<MonthlyPayment | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updatePayment(arg0, to_candid_UpdatePaymentRequest_n46(this._uploadFile, this._downloadFile, arg1));
+                return from_candid_opt_n48(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updatePayment(arg0, to_candid_UpdatePaymentRequest_n46(this._uploadFile, this._downloadFile, arg1));
+            return from_candid_opt_n48(this._uploadFile, this._downloadFile, result);
         }
     }
     async updateProfile(arg0: UpdateProfileRequest): Promise<Profile | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateProfile(to_candid_UpdateProfileRequest_n46(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_opt_n30(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.updateProfile(to_candid_UpdateProfileRequest_n49(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_opt_n32(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateProfile(to_candid_UpdateProfileRequest_n46(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_opt_n30(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.updateProfile(to_candid_UpdateProfileRequest_n49(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_opt_n32(this._uploadFile, this._downloadFile, result);
         }
     }
     async updateStudent(arg0: string, arg1: UpdateStudentRequest): Promise<Student | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateStudent(arg0, to_candid_UpdateStudentRequest_n48(this._uploadFile, this._downloadFile, arg1));
-                return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.updateStudent(arg0, to_candid_UpdateStudentRequest_n51(this._uploadFile, this._downloadFile, arg1));
+                return from_candid_opt_n39(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateStudent(arg0, to_candid_UpdateStudentRequest_n48(this._uploadFile, this._downloadFile, arg1));
-            return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.updateStudent(arg0, to_candid_UpdateStudentRequest_n51(this._uploadFile, this._downloadFile, arg1));
+            return from_candid_opt_n39(this._uploadFile, this._downloadFile, result);
         }
     }
 }
 function from_candid_Admin_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Admin): Admin {
     return from_candid_record_n6(_uploadFile, _downloadFile, value);
 }
-function from_candid_MonthlyPayment_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _MonthlyPayment): MonthlyPayment {
-    return from_candid_record_n34(_uploadFile, _downloadFile, value);
+function from_candid_MonthlyPayment_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _MonthlyPayment): MonthlyPayment {
+    return from_candid_record_n36(_uploadFile, _downloadFile, value);
 }
 function from_candid_NotificationType_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _NotificationType): NotificationType {
     return from_candid_variant_n15(_uploadFile, _downloadFile, value);
@@ -586,8 +759,8 @@ function from_candid_NotificationType_n14(_uploadFile: (file: ExternalBlob) => P
 function from_candid_Notification_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Notification): Notification {
     return from_candid_record_n13(_uploadFile, _downloadFile, value);
 }
-function from_candid_PaymentMethod_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PaymentMethod): PaymentMethod {
-    return from_candid_variant_n36(_uploadFile, _downloadFile, value);
+function from_candid_PaymentMethod_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PaymentMethod): PaymentMethod {
+    return from_candid_variant_n38(_uploadFile, _downloadFile, value);
 }
 function from_candid_Profile_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Profile): Profile {
     return from_candid_record_n22(_uploadFile, _downloadFile, value);
@@ -595,26 +768,29 @@ function from_candid_Profile_n21(_uploadFile: (file: ExternalBlob) => Promise<Ui
 function from_candid_Role_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Role): Role {
     return from_candid_variant_n24(_uploadFile, _downloadFile, value);
 }
-function from_candid_Student_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Student): Student {
-    return from_candid_record_n26(_uploadFile, _downloadFile, value);
+function from_candid_Student_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Student): Student {
+    return from_candid_record_n28(_uploadFile, _downloadFile, value);
 }
-function from_candid_UserRole_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
-    return from_candid_variant_n29(_uploadFile, _downloadFile, value);
+function from_candid_UserRole_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n31(_uploadFile, _downloadFile, value);
 }
 function from_candid_opt_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserId]): UserId | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Admin]): Admin | null {
+function from_candid_opt_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Admin]): Admin | null {
     return value.length === 0 ? null : from_candid_Admin_n5(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_opt_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Profile]): Profile | null {
+function from_candid_opt_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Profile]): Profile | null {
     return value.length === 0 ? null : from_candid_Profile_n21(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_opt_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Student]): Student | null {
-    return value.length === 0 ? null : from_candid_Student_n25(_uploadFile, _downloadFile, value[0]);
+function from_candid_opt_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Student]): Student | null {
+    return value.length === 0 ? null : from_candid_Student_n27(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_opt_n45(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_MonthlyPayment]): MonthlyPayment | null {
-    return value.length === 0 ? null : from_candid_MonthlyPayment_n33(_uploadFile, _downloadFile, value[0]);
+function from_candid_opt_n45(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ClassRecord]): ClassRecord | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n48(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_MonthlyPayment]): MonthlyPayment | null {
+    return value.length === 0 ? null : from_candid_MonthlyPayment_n35(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
@@ -682,52 +858,79 @@ function from_candid_record_n22(_uploadFile: (file: ExternalBlob) => Promise<Uin
         phone: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.phone))
     };
 }
-function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: string;
+    dob: [] | [string];
     updated_at: _Timestamp;
     joined_date: _Timestamp;
     admin_id: _UserId;
     class: string;
     name: string;
     fee_start_date: _Timestamp;
+    section: [] | [string];
     created_at: _Timestamp;
+    admission_date: [] | [string];
     email: string;
+    enrollment_number: [] | [string];
+    parent_phone: [] | [string];
+    address: [] | [string];
+    gender: [] | [string];
     is_active: boolean;
+    phone: [] | [string];
     monthly_fee: bigint;
     course: string;
     profile_id: [] | [_UserId];
+    parent_name: [] | [string];
 }): {
     id: string;
+    dob?: string;
     updated_at: Timestamp;
     joined_date: Timestamp;
     admin_id: UserId;
     class: string;
     name: string;
     fee_start_date: Timestamp;
+    section?: string;
     created_at: Timestamp;
+    admission_date?: string;
     email: string;
+    enrollment_number?: string;
+    parent_phone?: string;
+    address?: string;
+    gender?: string;
     is_active: boolean;
+    phone?: string;
     monthly_fee: bigint;
     course: string;
     profile_id?: UserId;
+    parent_name?: string;
 } {
     return {
         id: value.id,
+        dob: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.dob)),
         updated_at: value.updated_at,
         joined_date: value.joined_date,
         admin_id: value.admin_id,
         class: value.class,
         name: value.name,
         fee_start_date: value.fee_start_date,
+        section: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.section)),
         created_at: value.created_at,
+        admission_date: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.admission_date)),
         email: value.email,
+        enrollment_number: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.enrollment_number)),
+        parent_phone: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.parent_phone)),
+        address: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.address)),
+        gender: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.gender)),
         is_active: value.is_active,
+        phone: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.phone)),
         monthly_fee: value.monthly_fee,
         course: value.course,
-        profile_id: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.profile_id))
+        profile_id: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.profile_id)),
+        parent_name: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.parent_name))
     };
 }
-function from_candid_record_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: string;
     month: string;
     payment_date: _Timestamp;
@@ -755,7 +958,7 @@ function from_candid_record_n34(_uploadFile: (file: ExternalBlob) => Promise<Uin
         admin_id: value.admin_id,
         student_id: value.student_id,
         created_at: value.created_at,
-        payment_method: from_candid_PaymentMethod_n35(_uploadFile, _downloadFile, value.payment_method),
+        payment_method: from_candid_PaymentMethod_n37(_uploadFile, _downloadFile, value.payment_method),
         amount_paid: value.amount_paid,
         notes: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.notes))
     };
@@ -802,7 +1005,7 @@ function from_candid_variant_n24(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): Role {
     return "admin" in value ? Role.admin : "student" in value ? Role.student : value;
 }
-function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
 } | {
     user: null;
@@ -811,7 +1014,7 @@ function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole {
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
-function from_candid_variant_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     card: null;
 } | {
     cash: null;
@@ -822,14 +1025,14 @@ function from_candid_variant_n36(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): PaymentMethod {
     return "card" in value ? PaymentMethod.card : "cash" in value ? PaymentMethod.cash : "cheque" in value ? PaymentMethod.cheque : "online" in value ? PaymentMethod.online : value;
 }
-function from_candid_vec_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Notification>): Array<Notification> {
+function from_candid_vec_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Notification>): Array<Notification> {
     return value.map((x)=>from_candid_Notification_n12(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_MonthlyPayment>): Array<MonthlyPayment> {
-    return value.map((x)=>from_candid_MonthlyPayment_n33(_uploadFile, _downloadFile, x));
+function from_candid_vec_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_MonthlyPayment>): Array<MonthlyPayment> {
+    return value.map((x)=>from_candid_MonthlyPayment_n35(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Student>): Array<Student> {
-    return value.map((x)=>from_candid_Student_n25(_uploadFile, _downloadFile, x));
+function from_candid_vec_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Student>): Array<Student> {
+    return value.map((x)=>from_candid_Student_n27(_uploadFile, _downloadFile, x));
 }
 function to_candid_CreateAdminRequest_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CreateAdminRequest): _CreateAdminRequest {
     return to_candid_record_n4(_uploadFile, _downloadFile, value);
@@ -840,26 +1043,29 @@ function to_candid_CreateNotificationRequest_n8(_uploadFile: (file: ExternalBlob
 function to_candid_CreateProfileRequest_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CreateProfileRequest): _CreateProfileRequest {
     return to_candid_record_n18(_uploadFile, _downloadFile, value);
 }
+function to_candid_CreateStudentRequest_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CreateStudentRequest): _CreateStudentRequest {
+    return to_candid_record_n26(_uploadFile, _downloadFile, value);
+}
 function to_candid_NotificationType_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: NotificationType): _NotificationType {
     return to_candid_variant_n11(_uploadFile, _downloadFile, value);
 }
-function to_candid_PaymentMethod_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): _PaymentMethod {
-    return to_candid_variant_n42(_uploadFile, _downloadFile, value);
+function to_candid_PaymentMethod_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): _PaymentMethod {
+    return to_candid_variant_n44(_uploadFile, _downloadFile, value);
 }
-function to_candid_RecordPaymentRequest_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: RecordPaymentRequest): _RecordPaymentRequest {
-    return to_candid_record_n40(_uploadFile, _downloadFile, value);
+function to_candid_RecordPaymentRequest_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: RecordPaymentRequest): _RecordPaymentRequest {
+    return to_candid_record_n42(_uploadFile, _downloadFile, value);
 }
 function to_candid_Role_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Role): _Role {
     return to_candid_variant_n20(_uploadFile, _downloadFile, value);
 }
-function to_candid_UpdatePaymentRequest_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdatePaymentRequest): _UpdatePaymentRequest {
-    return to_candid_record_n44(_uploadFile, _downloadFile, value);
-}
-function to_candid_UpdateProfileRequest_n46(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdateProfileRequest): _UpdateProfileRequest {
+function to_candid_UpdatePaymentRequest_n46(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdatePaymentRequest): _UpdatePaymentRequest {
     return to_candid_record_n47(_uploadFile, _downloadFile, value);
 }
-function to_candid_UpdateStudentRequest_n48(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdateStudentRequest): _UpdateStudentRequest {
-    return to_candid_record_n49(_uploadFile, _downloadFile, value);
+function to_candid_UpdateProfileRequest_n49(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdateProfileRequest): _UpdateProfileRequest {
+    return to_candid_record_n50(_uploadFile, _downloadFile, value);
+}
+function to_candid_UpdateStudentRequest_n51(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdateStudentRequest): _UpdateStudentRequest {
+    return to_candid_record_n52(_uploadFile, _downloadFile, value);
 }
 function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n2(_uploadFile, _downloadFile, value);
@@ -885,6 +1091,60 @@ function to_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         phone: value.phone ? candid_some(value.phone) : candid_none()
     };
 }
+function to_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    dob?: string;
+    joined_date: Timestamp;
+    class: string;
+    name: string;
+    fee_start_date: Timestamp;
+    section?: string;
+    admission_date?: string;
+    email: string;
+    enrollment_number?: string;
+    parent_phone?: string;
+    address?: string;
+    gender?: string;
+    phone?: string;
+    monthly_fee: bigint;
+    course: string;
+    parent_name?: string;
+}): {
+    dob: [] | [string];
+    joined_date: _Timestamp;
+    class: string;
+    name: string;
+    fee_start_date: _Timestamp;
+    section: [] | [string];
+    admission_date: [] | [string];
+    email: string;
+    enrollment_number: [] | [string];
+    parent_phone: [] | [string];
+    address: [] | [string];
+    gender: [] | [string];
+    phone: [] | [string];
+    monthly_fee: bigint;
+    course: string;
+    parent_name: [] | [string];
+} {
+    return {
+        dob: value.dob ? candid_some(value.dob) : candid_none(),
+        joined_date: value.joined_date,
+        class: value.class,
+        name: value.name,
+        fee_start_date: value.fee_start_date,
+        section: value.section ? candid_some(value.section) : candid_none(),
+        admission_date: value.admission_date ? candid_some(value.admission_date) : candid_none(),
+        email: value.email,
+        enrollment_number: value.enrollment_number ? candid_some(value.enrollment_number) : candid_none(),
+        parent_phone: value.parent_phone ? candid_some(value.parent_phone) : candid_none(),
+        address: value.address ? candid_some(value.address) : candid_none(),
+        gender: value.gender ? candid_some(value.gender) : candid_none(),
+        phone: value.phone ? candid_some(value.phone) : candid_none(),
+        monthly_fee: value.monthly_fee,
+        course: value.course,
+        parent_name: value.parent_name ? candid_some(value.parent_name) : candid_none()
+    };
+}
 function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     institute_code: string;
     institute_name: string;
@@ -900,7 +1160,7 @@ function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         address: value.address ? candid_some(value.address) : candid_none()
     };
 }
-function to_candid_record_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     month: string;
     payment_date: Timestamp;
     student_id: string;
@@ -919,12 +1179,12 @@ function to_candid_record_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         month: value.month,
         payment_date: value.payment_date,
         student_id: value.student_id,
-        payment_method: to_candid_PaymentMethod_n41(_uploadFile, _downloadFile, value.payment_method),
+        payment_method: to_candid_PaymentMethod_n43(_uploadFile, _downloadFile, value.payment_method),
         amount_paid: value.amount_paid,
         notes: value.notes ? candid_some(value.notes) : candid_none()
     };
 }
-function to_candid_record_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n47(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     payment_date?: Timestamp;
     payment_method?: PaymentMethod;
     amount_paid?: bigint;
@@ -937,12 +1197,12 @@ function to_candid_record_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 } {
     return {
         payment_date: value.payment_date ? candid_some(value.payment_date) : candid_none(),
-        payment_method: value.payment_method ? candid_some(to_candid_PaymentMethod_n41(_uploadFile, _downloadFile, value.payment_method)) : candid_none(),
+        payment_method: value.payment_method ? candid_some(to_candid_PaymentMethod_n43(_uploadFile, _downloadFile, value.payment_method)) : candid_none(),
         amount_paid: value.amount_paid ? candid_some(value.amount_paid) : candid_none(),
         notes: value.notes ? candid_some(value.notes) : candid_none()
     };
 }
-function to_candid_record_n47(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n50(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     avatar_url?: string;
     name?: string;
     email?: string;
@@ -963,28 +1223,55 @@ function to_candid_record_n47(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         phone: value.phone ? candid_some(value.phone) : candid_none()
     };
 }
-function to_candid_record_n49(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n52(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    dob?: string;
     class?: string;
     name?: string;
+    section?: string;
+    admission_date?: string;
     email?: string;
+    enrollment_number?: string;
+    parent_phone?: string;
+    address?: string;
+    gender?: string;
     is_active?: boolean;
+    phone?: string;
     monthly_fee?: bigint;
     course?: string;
+    parent_name?: string;
 }): {
+    dob: [] | [string];
     class: [] | [string];
     name: [] | [string];
+    section: [] | [string];
+    admission_date: [] | [string];
     email: [] | [string];
+    enrollment_number: [] | [string];
+    parent_phone: [] | [string];
+    address: [] | [string];
+    gender: [] | [string];
     is_active: [] | [boolean];
+    phone: [] | [string];
     monthly_fee: [] | [bigint];
     course: [] | [string];
+    parent_name: [] | [string];
 } {
     return {
+        dob: value.dob ? candid_some(value.dob) : candid_none(),
         class: value.class ? candid_some(value.class) : candid_none(),
         name: value.name ? candid_some(value.name) : candid_none(),
+        section: value.section ? candid_some(value.section) : candid_none(),
+        admission_date: value.admission_date ? candid_some(value.admission_date) : candid_none(),
         email: value.email ? candid_some(value.email) : candid_none(),
+        enrollment_number: value.enrollment_number ? candid_some(value.enrollment_number) : candid_none(),
+        parent_phone: value.parent_phone ? candid_some(value.parent_phone) : candid_none(),
+        address: value.address ? candid_some(value.address) : candid_none(),
+        gender: value.gender ? candid_some(value.gender) : candid_none(),
         is_active: value.is_active ? candid_some(value.is_active) : candid_none(),
+        phone: value.phone ? candid_some(value.phone) : candid_none(),
         monthly_fee: value.monthly_fee ? candid_some(value.monthly_fee) : candid_none(),
-        course: value.course ? candid_some(value.course) : candid_none()
+        course: value.course ? candid_some(value.course) : candid_none(),
+        parent_name: value.parent_name ? candid_some(value.parent_name) : candid_none()
     };
 }
 function to_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1050,7 +1337,7 @@ function to_candid_variant_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint
         student: null
     } : value;
 }
-function to_candid_variant_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): {
+function to_candid_variant_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PaymentMethod): {
     card: null;
 } | {
     cash: null;

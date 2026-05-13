@@ -2,12 +2,13 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { PageTransition } from "@/components/shared/PageTransition";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   useMarkAsRead,
   useStudentNotifications,
 } from "@/hooks/useNotifications";
-import { usePaymentsByStudent } from "@/hooks/usePayments";
-import { useStudents } from "@/hooks/useStudents";
+import { useMyPayments } from "@/hooks/usePayments";
+import { useMyStudentRecord } from "@/hooks/useStudents";
 import { useAuthStore } from "@/store/authStore";
 import type { Notification } from "@/types/notification";
 import {
@@ -16,10 +17,10 @@ import {
   getCurrentMonthKey,
   getMonthKey,
 } from "@/utils/formatters";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Bell,
   BellOff,
-  BookOpen,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -129,14 +130,13 @@ function NotificationItem({
 
 export default function StudentDashboardPage() {
   const { user } = useAuthStore();
-  const studentId = user?.id ?? "";
-  const { data: allStudents = [] } = useStudents();
-  const studentRecord = allStudents.find((s) => s.id === studentId);
-  const { data: payments = [], isLoading: paymentsLoading } =
-    usePaymentsByStudent(studentId);
+  const { data: studentRecord, isLoading: studentLoading } =
+    useMyStudentRecord();
+  const { data: payments = [], isLoading: paymentsLoading } = useMyPayments();
   const { data: notifications = [], isLoading: notifLoading } =
-    useStudentNotifications(studentId);
+    useStudentNotifications(studentRecord?.id ?? "");
   const markAsRead = useMarkAsRead();
+  const navigate = useNavigate();
 
   const currentMonth = getCurrentMonthKey();
   const paidThisMonth = payments
@@ -159,16 +159,24 @@ export default function StudentDashboardPage() {
   const now = new Date();
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "00")}`;
     const paid = payments
       .filter((p) => getMonthKey(p.payment_date) === key)
       .reduce((sum, p) => sum + p.amount_paid, 0);
     return { month: MONTH_NAMES[d.getMonth()], paid };
   });
 
+  // Next month due check
+  const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonthKey = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}`;
+  const nextMonthPaid = payments
+    .filter((p) => p.month === nextMonthKey)
+    .reduce((sum, p) => sum + p.amount_paid, 0);
+  const nextMonthDue = monthlyFee > 0 && nextMonthPaid < monthlyFee;
+
   const statsCards = [
     {
-      title: "Monthly Fee",
+      title: "Total Due",
       value: `₹${monthlyFee.toLocaleString("en-IN")}`,
       icon: Wallet,
       accent: "text-primary",
@@ -176,12 +184,12 @@ export default function StudentDashboardPage() {
       subtitle: studentRecord?.course ?? "—",
     },
     {
-      title: "Paid This Month",
-      value: `₹${paidThisMonth.toLocaleString("en-IN")}`,
-      icon: CheckCircle2,
+      title: "Total Paid",
+      value: `₹${totalPaid.toLocaleString("en-IN")}`,
+      icon: TrendingUp,
       accent: "text-emerald-500",
       bg: "bg-emerald-500/10",
-      subtitle: isPaidThisMonth ? "Fully cleared" : "Partial payment",
+      subtitle: `${payments.length} transactions`,
     },
     {
       title: "Pending Amount",
@@ -189,15 +197,7 @@ export default function StudentDashboardPage() {
       icon: pendingAmount > 0 ? Clock : CheckCircle2,
       accent: pendingAmount > 0 ? "text-amber-500" : "text-emerald-500",
       bg: pendingAmount > 0 ? "bg-amber-500/10" : "bg-emerald-500/10",
-      subtitle: pendingAmount > 0 ? "Outstanding" : "All clear",
-    },
-    {
-      title: "Total Paid",
-      value: `₹${totalPaid.toLocaleString("en-IN")}`,
-      icon: TrendingUp,
-      accent: "text-primary",
-      bg: "bg-primary/10",
-      subtitle: `${payments.length} transactions`,
+      subtitle: pendingAmount > 0 ? "Outstanding this month" : "All clear",
     },
   ];
 
@@ -244,32 +244,43 @@ export default function StudentDashboardPage() {
                 </div>
               )}
             </div>
-            <div className="glass-card rounded-xl px-4 py-3 shrink-0">
-              <p className="text-xs text-muted-foreground">Payment Status</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                {isPaidThisMonth ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                ) : (
-                  <Clock className="w-4 h-4 text-amber-500" />
-                )}
-                <span
-                  className={`text-sm font-semibold ${
-                    isPaidThisMonth ? "text-emerald-500" : "text-amber-500"
-                  }`}
-                >
-                  {isPaidThisMonth ? "Paid" : "Pending"}
-                </span>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="glass-card rounded-xl px-4 py-3">
+                <p className="text-xs text-muted-foreground">Payment Status</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {isPaidThisMonth ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  ) : (
+                    <Clock className="w-4 h-4 text-amber-500" />
+                  )}
+                  <span
+                    className={`text-sm font-semibold ${
+                      isPaidThisMonth ? "text-emerald-500" : "text-amber-500"
+                    }`}
+                  >
+                    {isPaidThisMonth ? "Paid" : "Pending"}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {formatMonth(currentMonth)}
+                </p>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {formatMonth(currentMonth)}
-              </p>
+              <Button
+                onClick={() => navigate({ to: "/student/fees" })}
+                className="gradient-accent text-primary-foreground gap-2 shrink-0"
+                data-ocid="student-dashboard.pay_fees_button"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span className="hidden sm:inline">Pay Fees</span>
+                <span className="sm:hidden">Pay</span>
+              </Button>
             </div>
           </div>
         </motion.div>
 
         {/* Stats Grid */}
         <div
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
           data-ocid="student-dashboard.stats_section"
         >
           {statsCards.map((card, idx) => (
@@ -286,23 +297,67 @@ export default function StudentDashboardPage() {
               className="glass-card rounded-2xl p-5 shadow-soft cursor-default"
               data-ocid={`student-dashboard.stats_card.${idx + 1}`}
             >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  {card.title}
-                </p>
-                <div className={`p-2 rounded-xl ${card.bg} ${card.accent}`}>
-                  <card.icon className="w-4 h-4" />
+              {studentLoading ? (
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-muted/60 rounded animate-pulse" />
+                  <div className="h-7 w-32 bg-muted/60 rounded animate-pulse" />
+                  <div className="h-3 w-20 bg-muted/40 rounded animate-pulse" />
                 </div>
-              </div>
-              <p className="font-display text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-                {card.value}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {card.subtitle}
-              </p>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {card.title}
+                    </p>
+                    <div className={`p-2 rounded-xl ${card.bg} ${card.accent}`}>
+                      <card.icon className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="font-display text-2xl font-bold text-foreground tracking-tight">
+                    {card.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {card.subtitle}
+                  </p>
+                </>
+              )}
             </motion.div>
           ))}
         </div>
+
+        {/* Upcoming Due Alert */}
+        {nextMonthDue && !studentLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            className="glass-card rounded-2xl px-5 py-4 border border-amber-500/30 bg-amber-500/5 flex items-center justify-between gap-4"
+            data-ocid="student-dashboard.upcoming_due_card"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Upcoming Fee Due — {formatMonth(nextMonthKey)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  ₹{monthlyFee.toLocaleString("en-IN")} due next month
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate({ to: "/student/fees" })}
+              className="border-amber-500/40 text-amber-600 hover:bg-amber-500/10 shrink-0"
+              data-ocid="student-dashboard.upcoming_pay_button"
+            >
+              View Fees
+            </Button>
+          </motion.div>
+        )}
 
         {/* Chart + Notifications row */}
         <div className="grid lg:grid-cols-3 gap-6">
@@ -448,9 +503,15 @@ export default function StudentDashboardPage() {
               Recent Payments
             </h3>
             {recentPayments.length > 0 && (
-              <span className="text-xs text-muted-foreground">
-                Last {recentPayments.length} transactions
-              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate({ to: "/student/payments" })}
+                className="text-xs text-muted-foreground hover:text-foreground"
+                data-ocid="student-dashboard.view_all_payments"
+              >
+                View All
+              </Button>
             )}
           </div>
           {paymentsLoading ? (

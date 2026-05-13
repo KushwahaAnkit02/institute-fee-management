@@ -13,6 +13,15 @@ module {
     joined_date : Common.Timestamp;
     fee_start_date : Common.Timestamp;
     is_active : Bool;
+    phone : ?Text;
+    gender : ?Text;
+    dob : ?Text;
+    address : ?Text;
+    parent_name : ?Text;
+    parent_phone : ?Text;
+    section : ?Text;
+    enrollment_number : ?Text;
+    admission_date : ?Text;
     created_at : Common.Timestamp;
     updated_at : Common.Timestamp;
   };
@@ -25,6 +34,15 @@ module {
     monthly_fee : Nat;
     joined_date : Common.Timestamp;
     fee_start_date : Common.Timestamp;
+    phone : ?Text;
+    gender : ?Text;
+    dob : ?Text;
+    address : ?Text;
+    parent_name : ?Text;
+    parent_phone : ?Text;
+    section : ?Text;
+    enrollment_number : ?Text;
+    admission_date : ?Text;
   };
 
   public type UpdateStudentRequest = {
@@ -34,5 +52,14 @@ module {
     course : ?Text;
     monthly_fee : ?Nat;
     is_active : ?Bool;
+    phone : ?Text;
+    gender : ?Text;
+    dob : ?Text;
+    address : ?Text;
+    parent_name : ?Text;
+    parent_phone : ?Text;
+    section : ?Text;
+    enrollment_number : ?Text;
+    admission_date : ?Text;
   };
 };

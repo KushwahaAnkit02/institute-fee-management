@@ -1,3 +1,4 @@
+import { ReceiptModal } from "@/components/modals/ReceiptModal";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { PageTransition } from "@/components/shared/PageTransition";
@@ -10,11 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { usePaymentsByStudent } from "@/hooks/usePayments";
-import { useAuthStore } from "@/store/authStore";
+import { useMyPayments } from "@/hooks/usePayments";
+import { useMyStudentRecord } from "@/hooks/useStudents";
+import type { Payment } from "@/types/payment";
 import type { PaymentMethod } from "@/types/payment";
 import { formatDate, formatMonth } from "@/utils/formatters";
-import { BookOpen, CreditCard, Search, X } from "lucide-react";
+import { BookOpen, CreditCard, Receipt, Search, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 
@@ -33,11 +35,14 @@ const METHOD_ICONS: Record<PaymentMethod, string> = {
 };
 
 export default function StudentPaymentsPage() {
-  const { user } = useAuthStore();
-  const studentId = user?.id ?? "";
-  const { data: payments = [], isLoading } = usePaymentsByStudent(studentId);
+  const { data: studentRecord } = useMyStudentRecord();
+  const { data: payments = [], isLoading } = useMyPayments();
   const [search, setSearch] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
+  const [receiptModal, setReceiptModal] = useState<{
+    payment: Payment;
+    student: import("@/types/student").Student;
+  } | null>(null);
 
   const months = useMemo(() => {
     const set = new Set(payments.map((p) => p.month));
@@ -65,7 +70,33 @@ export default function StudentPaymentsPage() {
 
   const totalAll = payments.reduce((sum, p) => sum + p.amount_paid, 0);
   const totalFiltered = filtered.reduce((sum, p) => sum + p.amount_paid, 0);
+  const avgMonthly =
+    months.length > 0 ? Math.round(totalAll / months.length) : 0;
   const isFiltering = filterMonth !== "all" || search.length > 0;
+
+  const summaryCards = [
+    {
+      label: "Total Paid",
+      value: `₹${totalAll.toLocaleString("en-IN")}`,
+      sub: `${payments.length} transactions`,
+      accent: "text-primary",
+      ocid: "student-payments.summary_total",
+    },
+    {
+      label: "Count of Payments",
+      value: String(payments.length),
+      sub: `${months.length} distinct months`,
+      accent: "text-emerald-500",
+      ocid: "student-payments.summary_count",
+    },
+    {
+      label: "Average Monthly",
+      value: `₹${avgMonthly.toLocaleString("en-IN")}`,
+      sub: "per month avg",
+      accent: "text-amber-500",
+      ocid: "student-payments.summary_avg",
+    },
+  ];
 
   return (
     <PageTransition>
@@ -86,56 +117,48 @@ export default function StudentPaymentsPage() {
         </div>
 
         {/* Summary Cards */}
-        {!isLoading && payments.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0 }}
-              className="glass-card rounded-2xl p-4 shadow-soft"
-              data-ocid="student-payments.summary_total"
-            >
-              <p className="text-xs text-muted-foreground">Total Paid</p>
-              <p className="font-display text-xl font-bold text-foreground mt-1">
-                ₹{totalAll.toLocaleString("en-IN")}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {payments.length} transactions
-              </p>
-            </motion.div>
-            {isFiltering && (
+        {!isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {summaryCards.map((card, idx) => (
               <motion.div
+                key={card.label}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.06 }}
-                className="glass-card rounded-2xl p-4 shadow-soft"
-                data-ocid="student-payments.summary_filtered"
+                transition={{ delay: idx * 0.06 }}
+                className="glass-card rounded-2xl p-5 shadow-soft"
+                data-ocid={card.ocid}
               >
-                <p className="text-xs text-muted-foreground">Filtered Total</p>
-                <p className="font-display text-xl font-bold text-primary mt-1">
-                  ₹{totalFiltered.toLocaleString("en-IN")}
+                <p className="text-xs text-muted-foreground">{card.label}</p>
+                <p
+                  className={`font-display text-2xl font-bold mt-1 ${card.accent}`}
+                >
+                  {card.value}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {filtered.length} results
+                  {card.sub}
                 </p>
               </motion.div>
-            )}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12 }}
-              className="glass-card rounded-2xl p-4 shadow-soft"
-              data-ocid="student-payments.summary_months"
-            >
-              <p className="text-xs text-muted-foreground">Months Paid</p>
-              <p className="font-display text-xl font-bold text-foreground mt-1">
-                {months.length}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                distinct months
-              </p>
-            </motion.div>
+            ))}
           </div>
+        )}
+
+        {/* Filtered total chip */}
+        {isFiltering && filtered.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="glass-card inline-flex items-center gap-2 rounded-xl px-4 py-2 border border-primary/20 bg-primary/5"
+          >
+            <span className="text-xs text-muted-foreground">
+              Filtered total:
+            </span>
+            <span className="text-sm font-semibold text-primary">
+              ₹{totalFiltered.toLocaleString("en-IN")}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({filtered.length} results)
+            </span>
+          </motion.div>
         )}
 
         {/* Filters */}
@@ -223,6 +246,9 @@ export default function StudentPaymentsPage() {
                     <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
                       Notes
                     </th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Receipt
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -262,6 +288,28 @@ export default function StudentPaymentsPage() {
                       <td className="px-5 py-3 text-muted-foreground text-xs hidden lg:table-cell max-w-[180px] truncate">
                         {p.notes ?? "—"}
                       </td>
+                      <td className="px-5 py-3">
+                        {studentRecord ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReceiptModal({
+                                payment: p,
+                                student: studentRecord,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-fast"
+                            data-ocid={`student-payments.receipt_button.${idx + 1}`}
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Receipt</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            —
+                          </span>
+                        )}
+                      </td>
                     </motion.tr>
                   ))}
                 </tbody>
@@ -270,6 +318,14 @@ export default function StudentPaymentsPage() {
           )}
         </div>
       </div>
+      {receiptModal && (
+        <ReceiptModal
+          isOpen={!!receiptModal}
+          onClose={() => setReceiptModal(null)}
+          payment={receiptModal.payment}
+          student={receiptModal.student}
+        />
+      )}
     </PageTransition>
   );
 }

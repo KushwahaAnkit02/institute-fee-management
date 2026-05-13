@@ -20,11 +20,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    // 1. Restore existing session on mount
     const initSession = async () => {
       try {
         const {
           data: { session },
+          error,
         } = await supabase.auth.getSession();
+
+        if (error) {
+          // Stale/invalid session — clear it
+          await supabase.auth.signOut();
+          if (mounted) storeLogout();
+          return;
+        }
+
         if (session?.user && mounted) {
           const authUser = await buildAuthUser(session.user.id);
           if (authUser && mounted) {
@@ -42,19 +52,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initSession();
 
+    // 2. Listen for auth state changes (token refresh, sign-in, sign-out)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       if (event === "SIGNED_OUT" || !session) {
-        if (mounted) storeLogout();
+        storeLogout();
         return;
       }
+
       if (
-        (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") &&
-        session.user
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
       ) {
-        const authUser = await buildAuthUser(session.user.id);
-        if (authUser && mounted) login(authUser);
+        if (session.user) {
+          const authUser = await buildAuthUser(session.user.id);
+          if (authUser && mounted) login(authUser);
+          else if (mounted) storeLogout();
+        }
+      }
+
+      if (event === "PASSWORD_RECOVERY") {
+        // Session is available; user can update password on the settings page
+        if (session.user) {
+          const authUser = await buildAuthUser(session.user.id);
+          if (authUser && mounted) login(authUser);
+        }
       }
     });
 

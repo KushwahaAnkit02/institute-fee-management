@@ -78,6 +78,18 @@ export async function updateStudent(
   return data as Student;
 }
 
+export async function getStudentByProfileId(
+  profileId: string,
+): Promise<Student | null> {
+  const { data, error } = await supabase
+    .from("students")
+    .select("*")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as Student;
+}
+
 export async function deleteStudent(id: string): Promise<void> {
   const { error } = await supabase.from("students").delete().eq("id", id);
   if (error) throw error;

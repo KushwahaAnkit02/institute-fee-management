@@ -426,6 +426,105 @@ export async function resendVerificationEmail(email: string): Promise<void> {
 }
 
 // =========================================
+// ENROLLMENT CODE — generate, verify, link
+// =========================================
+
+/**
+ * Generates an enrollment code for a student.
+ * Format: FirstName + "@" + 4 random digits (e.g. "Rahul@4821")
+ */
+export function generateEnrollmentCode(firstName: string): string {
+  const sanitized = firstName
+    .trim()
+    .split(/\s+/)[0]
+    .replace(/[^a-zA-Z]/g, "");
+  const digits = Math.floor(1000 + Math.random() * 9000).toString();
+  return `${sanitized}@${digits}`;
+}
+
+/**
+ * Verifies whether the provided enrollment code matches
+ * the enrollment_number stored in the student record.
+ */
+export async function verifyEnrollmentCode(
+  studentId: string,
+  code: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("students")
+    .select("enrollment_number")
+    .eq("id", studentId)
+    .single();
+
+  if (error || !data) return false;
+  return (
+    (data as { enrollment_number: string | null }).enrollment_number?.trim() ===
+    code.trim()
+  );
+}
+
+/**
+ * Links the currently authenticated user's profile to the student record
+ * matching the provided enrollment code.
+ * Called after a student signs in for the first time and enters their code.
+ */
+export async function linkStudentProfile(
+  enrollmentCode: string,
+): Promise<void> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user) throw new Error("No authenticated user found.");
+  const userId = session.user.id;
+
+  // Find the student record matching this code that is not yet linked
+  const { data: studentRecord, error: findError } = await supabase
+    .from("students")
+    .select("id, name, email, admin_id")
+    .eq("enrollment_number", enrollmentCode.trim())
+    .is("profile_id", null)
+    .maybeSingle();
+
+  if (findError) throw new Error(`Database error: ${findError.message}`);
+  if (!studentRecord)
+    throw new Error(
+      "Invalid enrollment code or account already linked. Please contact your institute admin.",
+    );
+
+  // Check if a profile already exists for this user
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: userId,
+      role: "student" as const,
+      name: studentRecord.name,
+      email: studentRecord.email,
+      is_active: true,
+      provider: "email" as const,
+      avatar_url: null,
+      phone: null,
+    });
+    if (profileError)
+      throw new Error(`Failed to create profile: ${profileError.message}`);
+  }
+
+  // Link the student record to this user
+  const { error: linkError } = await supabase
+    .from("students")
+    .update({ profile_id: userId })
+    .eq("id", studentRecord.id);
+
+  if (linkError)
+    throw new Error(`Failed to link student record: ${linkError.message}`);
+}
+
+// =========================================
 // ERROR MESSAGE MAPPER
 // =========================================
 export function getAuthErrorMessage(errorCode: string): string {

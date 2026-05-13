@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type Admin__283569800 =
   {
     address : ?Text;
@@ -7,6 +7,14 @@ type Admin__283569800 =
     institute_code : Text;
     institute_name : Text;
     profile_id : UserId__158757552
+  };
+type ClassRecord__734901508 =
+  {
+    admin_id : UserId__158757552;
+    created_at : Timestamp__301639476;
+    description : Text;
+    id : Text;
+    name : Text
   };
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
@@ -48,6 +56,22 @@ type Notification__264708741 =
     title : Text;
     type_ : NotificationType__338939744
   };
+type OldStudent__333394504 =
+  {
+    admin_id : Text;
+    class_ : Text;
+    course : Text;
+    created_at : Int;
+    email : Text;
+    fee_start_date : Int;
+    id : Text;
+    is_active : Bool;
+    joined_date : Int;
+    monthly_fee : Nat;
+    name : Text;
+    profile_id : ?Text;
+    updated_at : Int
+  };
 type PaymentMethod__46913440 = {#card; #cash; #cheque; #online};
 type Profile__469549097 =
   {
@@ -62,20 +86,37 @@ type Profile__469549097 =
     updated_at : Timestamp__301639476
   };
 type Role__300349085 = {#admin; #student};
-type Student__26715999 =
+type SectionRecord__492154375 =
   {
     admin_id : UserId__158757552;
+    class_id : Text;
+    created_at : Timestamp__301639476;
+    id : Text;
+    name : Text
+  };
+type Student__26715999 =
+  {
+    address : ?Text;
+    admin_id : UserId__158757552;
+    admission_date : ?Text;
     class_ : Text;
     course : Text;
     created_at : Timestamp__301639476;
+    dob : ?Text;
     email : Text;
+    enrollment_number : ?Text;
     fee_start_date : Timestamp__301639476;
+    gender : ?Text;
     id : Text;
     is_active : Bool;
     joined_date : Timestamp__301639476;
     monthly_fee : Nat;
     name : Text;
+    parent_name : ?Text;
+    parent_phone : ?Text;
+    phone : ?Text;
     profile_id : ?UserId__158757552;
+    section : ?Text;
     updated_at : Timestamp__301639476
   };
 type Time__796480547 = Int__270357528;
@@ -83,7 +124,7 @@ type Time__900049286 = Time__796480547;
 type Timestamp__301639476 = Time__900049286;
 type UserId__158757552 = Text;
 type UserRole__1073662873 = {#admin; #guest; #user};
-actor {
+actor ({
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -109,9 +150,46 @@ actor {
       var root : Node__46230540<Text, Profile__469549097>;
       var size : Nat__490723111
     };
+  in students : Map__605269027<Text, OldStudent__333394504>
+}, {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1073662873>
+    };
+  stable admins :
+    {
+      var root : Node__46230540<Text, Admin__283569800>;
+      var size : Nat__490723111
+    };
+  stable classes :
+    {
+      var root : Node__46230540<Text, ClassRecord__734901508>;
+      var size : Nat__490723111
+    };
+  stable notifications :
+    {
+      var root : Node__46230540<Text, Notification__264708741>;
+      var size : Nat__490723111
+    };
+  stable payments :
+    {
+      var root : Node__46230540<Text, MonthlyPayment__302287223>;
+      var size : Nat__490723111
+    };
+  stable profiles :
+    {
+      var root : Node__46230540<Text, Profile__469549097>;
+      var size : Nat__490723111
+    };
+  stable sections :
+    {
+      var root : Node__46230540<Text, SectionRecord__492154375>;
+      var size : Nat__490723111
+    };
   stable students :
     {
       var root : Node__46230540<Text, Student__26715999>;
       var size : Nat__490723111
     }
-};
+});
