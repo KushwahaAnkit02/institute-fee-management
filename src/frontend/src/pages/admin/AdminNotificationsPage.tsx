@@ -196,7 +196,7 @@ export function AdminNotificationsPage() {
                       <SelectItem value="all">All Students</SelectItem>
                       {students.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
-                          {s.name}
+                          {s.full_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -345,7 +345,7 @@ export function AdminNotificationsPage() {
                               </Badge>
                               {recipient && (
                                 <span className="text-[10px] text-muted-foreground">
-                                  → {recipient.name}
+                                  → {recipient.full_name}
                                 </span>
                               )}
                               {!notif.student_id && (

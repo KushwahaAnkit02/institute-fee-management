@@ -1,4 +1,12 @@
+import type { User } from "@supabase/supabase-js";
+
 export type Role = "admin" | "student";
+
+export type AuthProvider = "email" | "google";
+
+// -------------------------------------------------------------------------
+// Database row types
+// -------------------------------------------------------------------------
 
 export interface Profile {
   id: string;
@@ -7,8 +15,13 @@ export interface Profile {
   email: string;
   avatar_url: string | null;
   phone: string | null;
+  gender: string | null;
+  dob: string | null;
+  address: string | null;
+  provider: AuthProvider;
+  temp_password: boolean;
+  must_change_password: boolean;
   is_active: boolean;
-  provider: "email" | "google";
   created_at: string;
   updated_at: string;
 }
@@ -22,35 +35,53 @@ export interface AdminRecord {
   created_at: string;
 }
 
+// -------------------------------------------------------------------------
+// Composite auth user (Supabase user + derived profile rows)
+// -------------------------------------------------------------------------
+
 export interface AuthUser {
-  id: string;
-  email: string;
-  role: Role;
-  name: string;
-  avatar_url: string | null;
-  phone: string | null;
-  // Admin-only
-  institute_name?: string;
-  institute_code?: string;
-  admin_id?: string;
-  // Student-only
-  student_id?: string;
-  linked_admin_id?: string;
+  /** Supabase Auth User */
+  user: User;
+  /** Application profile row */
+  profile: Profile | null;
+  /** Admin row — only present when profile.role === 'admin' */
+  admin: AdminRecord | null;
 }
 
+// -------------------------------------------------------------------------
+// Zustand auth store shape
+// -------------------------------------------------------------------------
+
 export interface AuthState {
-  user: AuthUser | null;
+  // State
+  user: User | null;
+  profile: Profile | null;
+  admin: AdminRecord | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (user: AuthUser) => void;
-  logout: () => void | Promise<void>;
+  /** True once the initial session check has completed (even if no session). */
+  isInitialized: boolean;
+
+  // Actions
+  initialize: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
+  setUser: (
+    user: User | null,
+    profile: Profile | null,
+    admin: AdminRecord | null,
+  ) => void;
   setLoading: (loading: boolean) => void;
+  setInitialized: (initialized: boolean) => void;
 }
+
+// -------------------------------------------------------------------------
+// Form credential types
+// -------------------------------------------------------------------------
 
 export interface LoginCredentials {
   email: string;
   password: string;
-  role: Role;
 }
 
 export interface SignupCredentials {
@@ -62,5 +93,3 @@ export interface SignupCredentials {
   institute_code?: string;
   address?: string;
 }
-
-export type AuthProvider = "email" | "google";

@@ -9,8 +9,8 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useStudents() {
-  const user = useAuthStore((s) => s.user);
-  const adminId = user?.admin_id;
+  const admin = useAuthStore((s) => s.admin);
+  const adminId = admin?.id;
   return useQuery<Student[]>({
     queryKey: ["students", adminId],
     queryFn: () => studentSvc.getStudents(adminId!),
@@ -20,22 +20,24 @@ export function useStudents() {
 }
 
 /** Student-scoped: fetches the student record linked to the current user's profile. */
+/** Student-scoped: fetches the student record linked to the current user's profile. */
 export function useMyStudentRecord() {
   const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
   return useQuery<Student | null>({
     queryKey: ["student", "profile", user?.id],
     queryFn: () => (user?.id ? getStudentByProfileId(user.id) : null),
-    enabled: !!user?.id && user?.role === "student",
+    enabled: !!user?.id && profile?.role === "student",
     staleTime: 0,
   });
 }
 
 export function useAddStudent() {
-  const user = useAuthStore((s) => s.user);
+  const admin = useAuthStore((s) => s.admin);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (form: CreateStudentForm) =>
-      studentSvc.addStudent(user?.admin_id!, form),
+      studentSvc.addStudent(admin?.id!, form),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["students"] }),
   });
 }

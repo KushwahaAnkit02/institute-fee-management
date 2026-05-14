@@ -1,3 +1,4 @@
+import { PaymentModal } from "@/components/modals/PaymentModal";
 import { ConfirmModal } from "@/components/shared/ConfirmModal";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -5,7 +6,6 @@ import { PageTransition } from "@/components/shared/PageTransition";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -13,19 +13,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   useAddPayment,
   useDeletePayment,
   usePayments,
 } from "@/hooks/usePayments";
 import { useStudents } from "@/hooks/useStudents";
+import { useAuthStore } from "@/store/authStore";
 import type {
   Payment,
   PaymentMethod,
   RecordPaymentForm,
 } from "@/types/payment";
-import { formatMonth, getCurrentMonthKey } from "@/utils/formatters";
+import { formatMonth } from "@/utils/formatters";
 import {
   BookOpen,
   Calendar,
@@ -49,274 +49,19 @@ const METHOD_BADGE: Record<
   card: { label: "Card", className: "bg-purple-500/15 text-purple-600" },
 };
 
-const PM_METHODS: { value: PaymentMethod; label: string }[] = [
+const _PM_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "cash", label: "Cash" },
   { value: "online", label: "Online Transfer" },
   { value: "cheque", label: "Cheque" },
   { value: "card", label: "Card" },
 ];
 
-/* ---------- Record Payment Modal ---------- */
-interface RecordPaymentModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-function RecordPaymentModal({ open, onClose }: RecordPaymentModalProps) {
-  const { data: students = [] } = useStudents();
-  const addPayment = useAddPayment();
-  const activeStudents = students.filter((s) => s.is_active);
-
-  const [form, setForm] = useState<RecordPaymentForm>({
-    student_id: "",
-    month: getCurrentMonthKey(),
-    amount_paid: 0,
-    payment_method: "cash" as PaymentMethod,
-    notes: "",
-    payment_date: new Date().toISOString().split("T")[0],
-  });
-  const [errors, setErrors] = useState<{
-    student_id?: string;
-    amount_paid?: string;
-  }>({});
-
-  const selectedStudent = activeStudents.find((s) => s.id === form.student_id);
-
-  function handleStudentChange(id: string) {
-    const s = activeStudents.find((st) => st.id === id);
-    setForm((p) => ({
-      ...p,
-      student_id: id,
-      amount_paid: s?.monthly_fee ?? p.amount_paid,
-    }));
-    if (errors.student_id) setErrors((e) => ({ ...e, student_id: undefined }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const errs: { student_id?: string; amount_paid?: string } = {};
-    if (!form.student_id) errs.student_id = "Select a student";
-    if (!form.amount_paid || form.amount_paid <= 0)
-      errs.amount_paid = "Amount must be > 0";
-    if (Object.keys(errs).length) {
-      setErrors(errs);
-      return;
-    }
-    try {
-      await addPayment.mutateAsync(form);
-      toast.success(
-        `Payment of ₹${form.amount_paid.toLocaleString("en-IN")} recorded for ${selectedStudent?.name}!`,
-      );
-      setForm({
-        student_id: "",
-        month: getCurrentMonthKey(),
-        amount_paid: 0,
-        payment_method: "cash",
-        notes: "",
-        payment_date: new Date().toISOString().split("T")[0],
-      });
-      setErrors({});
-      onClose();
-    } catch {
-      toast.error("Failed to record payment");
-    }
-  }
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 24 }}
-            transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="fixed inset-x-4 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-14 sm:w-full sm:max-w-lg z-50"
-            data-ocid="record_payment_modal.dialog"
-          >
-            <div className="glass-card rounded-2xl shadow-elevated overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-5 border-b border-border/30">
-                <div>
-                  <h2 className="font-display font-semibold text-xl text-foreground">
-                    Record Payment
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Add a new payment transaction
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label="Close"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-fast"
-                  data-ocid="record_payment_modal.close_button"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-                <div className="space-y-1.5">
-                  <Label>
-                    Student <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={form.student_id}
-                    onValueChange={handleStudentChange}
-                  >
-                    <SelectTrigger
-                      className={errors.student_id ? "border-destructive" : ""}
-                      data-ocid="record_payment_modal.student_select"
-                    >
-                      <SelectValue placeholder="Select student" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeStudents.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name} — ₹{s.monthly_fee.toLocaleString("en-IN")}/mo
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.student_id && (
-                    <p
-                      className="text-xs text-destructive"
-                      data-ocid="record_payment_modal.student_error"
-                    >
-                      {errors.student_id}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Month</Label>
-                    <Input
-                      type="month"
-                      value={form.month}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, month: e.target.value }))
-                      }
-                      data-ocid="record_payment_modal.month_input"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>
-                      Amount (₹) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={form.amount_paid || ""}
-                      onChange={(e) => {
-                        setForm((p) => ({
-                          ...p,
-                          amount_paid: Number(e.target.value),
-                        }));
-                        if (errors.amount_paid)
-                          setErrors((er) => ({
-                            ...er,
-                            amount_paid: undefined,
-                          }));
-                      }}
-                      className={errors.amount_paid ? "border-destructive" : ""}
-                      data-ocid="record_payment_modal.amount_input"
-                    />
-                    {errors.amount_paid && (
-                      <p className="text-xs text-destructive">
-                        {errors.amount_paid}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Payment Method</Label>
-                    <Select
-                      value={form.payment_method}
-                      onValueChange={(v) =>
-                        setForm((p) => ({
-                          ...p,
-                          payment_method: v as PaymentMethod,
-                        }))
-                      }
-                    >
-                      <SelectTrigger data-ocid="record_payment_modal.method_select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PM_METHODS.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Payment Date</Label>
-                    <Input
-                      type="date"
-                      value={form.payment_date}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          payment_date: e.target.value,
-                        }))
-                      }
-                      data-ocid="record_payment_modal.date_input"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Notes (optional)</Label>
-                  <Textarea
-                    placeholder="e.g. UPI reference, cheque no..."
-                    value={form.notes ?? ""}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, notes: e.target.value }))
-                    }
-                    rows={2}
-                    data-ocid="record_payment_modal.notes_input"
-                  />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={onClose}
-                    data-ocid="record_payment_modal.cancel_button"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 gradient-accent text-primary-foreground"
-                    disabled={addPayment.isPending}
-                    data-ocid="record_payment_modal.submit_button"
-                  >
-                    {addPayment.isPending ? "Recording..." : "Record Payment"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
-
 export function AdminPaymentsPage() {
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
   const { data: students = [], isLoading: studentsLoading } = useStudents();
   const deleteMutation = useDeletePayment();
+  const addPayment = useAddPayment();
+  const admin = useAuthStore((s) => s.admin);
 
   const [search, setSearch] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
@@ -327,6 +72,19 @@ export function AdminPaymentsPage() {
   const [recordOpen, setRecordOpen] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
+
+  async function handleRecordPayment(form: RecordPaymentForm) {
+    try {
+      await addPayment.mutateAsync(form);
+      const student = students.find((s) => s.id === form.student_id);
+      toast.success(
+        `Payment of ₹${form.amount_paid.toLocaleString("en-IN")} recorded for ${student?.full_name ?? "student"}!`,
+      );
+      setRecordOpen(false);
+    } catch {
+      toast.error("Failed to record payment");
+    }
+  }
 
   const studentMap = new Map(students.map((s) => [s.id, s]));
 
@@ -340,7 +98,9 @@ export function AdminPaymentsPage() {
     const q = search.toLowerCase();
     if (q)
       list = list.filter((p) =>
-        (studentMap.get(p.student_id)?.name ?? "").toLowerCase().includes(q),
+        (studentMap.get(p.student_id)?.full_name ?? "")
+          .toLowerCase()
+          .includes(q),
       );
     if (filterMonth !== "all")
       list = list.filter((p) => p.month === filterMonth);
@@ -511,8 +271,8 @@ export function AdminPaymentsPage() {
                             <div className="flex items-center gap-2.5">
                               <div className="w-7 h-7 rounded-full gradient-accent flex items-center justify-center text-[10px] font-bold text-primary-foreground shrink-0">
                                 {(
-                                  studentMap.get(payment.student_id)?.name ??
-                                  "Unknown"
+                                  studentMap.get(payment.student_id)
+                                    ?.full_name ?? "Unknown"
                                 )
                                   .split(" ")
                                   .map((n) => n[0])
@@ -521,8 +281,8 @@ export function AdminPaymentsPage() {
                                   .slice(0, 2)}
                               </div>
                               <span className="font-medium text-foreground truncate max-w-[120px]">
-                                {studentMap.get(payment.student_id)?.name ??
-                                  "Unknown"}
+                                {studentMap.get(payment.student_id)
+                                  ?.full_name ?? "Unknown"}
                               </span>
                             </div>
                           </td>
@@ -598,9 +358,13 @@ export function AdminPaymentsPage() {
         </div>
       </div>
 
-      <RecordPaymentModal
+      <PaymentModal
         open={recordOpen}
         onClose={() => setRecordOpen(false)}
+        onSuccess={handleRecordPayment}
+        students={students.filter((s) => s.is_active)}
+        adminId={admin?.id ?? ""}
+        isLoading={addPayment.isPending}
       />
 
       <ConfirmModal
@@ -610,7 +374,7 @@ export function AdminPaymentsPage() {
           deleteTarget?.amount_paid?.toLocaleString("en-IN") ?? ""
         } for ${
           deleteTarget
-            ? (studentMap.get(deleteTarget.student_id)?.name ?? "Unknown")
+            ? (studentMap.get(deleteTarget.student_id)?.full_name ?? "Unknown")
             : ""
         }.`}
         confirmLabel="Delete"

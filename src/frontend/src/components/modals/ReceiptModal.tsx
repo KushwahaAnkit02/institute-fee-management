@@ -104,27 +104,23 @@ export function ReceiptModal({
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div>
                   <p className="text-[11px] text-muted-foreground">Full Name</p>
-                  <p className="font-medium text-foreground">{student.name}</p>
+                  <p className="font-medium text-foreground">
+                    {student.full_name}
+                  </p>
                 </div>
                 <div>
                   <p className="text-[11px] text-muted-foreground">Class</p>
                   <p className="font-medium text-foreground">
-                    {student.class_}
+                    {student.class_id ?? "—"}
                   </p>
                 </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Course</p>
-                  <p className="font-medium text-foreground">
-                    {student.course}
-                  </p>
-                </div>
-                {student.enrollmentNumber && (
+                {student.enrollment_no && (
                   <div>
                     <p className="text-[11px] text-muted-foreground">
                       Enrollment No.
                     </p>
                     <p className="font-medium text-foreground font-mono">
-                      {student.enrollmentNumber}
+                      {student.enrollment_no}
                     </p>
                   </div>
                 )}

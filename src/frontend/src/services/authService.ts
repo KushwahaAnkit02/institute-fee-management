@@ -1,84 +1,19 @@
+import type { TablesInsert, TablesUpdate } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
-import type { AuthUser, Role, SignupCredentials } from "@/types/auth";
+import type { AdminRecord, Profile, Role } from "@/types/auth";
+import type { Student } from "@/types/student";
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 
-// =========================================
-// HELPER: Build AuthUser from profile + related data
-// =========================================
-export async function buildAuthUser(userId: string): Promise<AuthUser | null> {
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
-  if (error || !profile) return null;
-
-  const authUser: AuthUser = {
-    id: profile.id,
-    email: profile.email,
-    role: profile.role as Role,
-    name: profile.name,
-    avatar_url: profile.avatar_url,
-    phone: profile.phone,
-  };
-
-  if (profile.role === "admin") {
-    const { data: adminRecord } = await supabase
-      .from("admins")
-      .select("*")
-      .eq("profile_id", userId)
-      .single();
-
-    if (adminRecord) {
-      authUser.admin_id = adminRecord.id;
-      authUser.institute_name = adminRecord.institute_name;
-      authUser.institute_code = adminRecord.institute_code;
-    }
-  } else if (profile.role === "student") {
-    const { data: studentRecord } = await supabase
-      .from("students")
-      .select("*")
-      .eq("profile_id", userId)
-      .single();
-
-    if (studentRecord) {
-      authUser.student_id = studentRecord.id;
-      authUser.linked_admin_id = studentRecord.admin_id;
-    }
-  }
-
-  return authUser;
-}
-
-// =========================================
-// HELPER: Detect auth provider for an email
-// =========================================
-async function getEmailAuthProvider(
-  email: string,
-): Promise<"email" | "google" | null> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("provider")
-    .eq("email", email)
-    .maybeSingle();
-
-  if (!profile) return null;
-  return (profile as { provider: "email" | "google" }).provider;
-}
-
-// =========================================
-// ADMIN SIGNUP
-// =========================================
+// ---------------------------------------------------------------------------
+// Admin signup
+// ---------------------------------------------------------------------------
 export async function signUpAdmin(
-  credentials: SignupCredentials,
-): Promise<AuthUser> {
-  const { email, password, name, institute_name, institute_code, address } =
-    credentials;
-
-  const existingProvider = await getEmailAuthProvider(email);
-  if (existingProvider === "email") throw new Error("AUTH_ALREADY_REGISTERED");
-  if (existingProvider === "google") throw new Error("AUTH_GOOGLE_ACCOUNT");
-
+  email: string,
+  password: string,
+  name: string,
+  instituteName: string,
+  instituteCode: string,
+): Promise<{ user: User; profile: Profile; admin: AdminRecord }> {
   const { data: authData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
@@ -91,7 +26,8 @@ export async function signUpAdmin(
   if (signUpError) {
     if (
       signUpError.message.includes("already registered") ||
-      signUpError.message.includes("already been registered")
+      signUpError.message.includes("already been registered") ||
+      (signUpError as AuthError & { code?: string }).code === "email_taken"
     ) {
       throw new Error("AUTH_ALREADY_REGISTERED");
     }
@@ -101,141 +37,68 @@ export async function signUpAdmin(
   if (!authData.user) throw new Error("Signup failed — no user returned");
 
   const userId = authData.user.id;
+  const code =
+    instituteCode.trim() || `AC${Date.now().toString(36).toUpperCase()}`;
 
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: userId,
-    role: "admin" as const,
-    name,
-    email,
-    is_active: true,
-    provider: "email" as const,
-    avatar_url: null,
-    phone: null,
-  });
-
-  if (profileError) {
-    await supabase.auth.signOut();
-    throw new Error(`Failed to create profile: ${profileError.message}`);
-  }
-
-  const code = institute_code || `AC${Date.now().toString(36).toUpperCase()}`;
-  const { error: adminError } = await supabase.from("admins").insert({
-    profile_id: userId,
-    institute_name: institute_name || "Akshay Classes",
-    institute_code: code,
-    address: address || null,
-  });
-
-  if (adminError) {
-    throw new Error(`Failed to create admin record: ${adminError.message}`);
-  }
-
-  if (!authData.session) {
-    throw new Error(`AUTH_EMAIL_VERIFICATION_REQUIRED:${email}`);
-  }
-
-  return (await buildAuthUser(userId)) as AuthUser;
-}
-
-// =========================================
-// STUDENT SIGNUP — links to pre-existing student record
-// =========================================
-export async function signUpStudent(
-  credentials: SignupCredentials,
-): Promise<AuthUser> {
-  const { email, password } = credentials;
-
-  // 1. Check if student record exists and is unlinked
-  const { data: studentRecord } = await supabase
-    .from("students")
-    .select("*")
-    .eq("email", email)
-    .is("profile_id", null)
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .insert({
+      id: userId,
+      role: "admin" as const,
+      name,
+      email,
+      is_active: true,
+      provider: "email" as const,
+      avatar_url: null,
+      phone: null,
+      must_change_password: false,
+      temp_password: false,
+    } as TablesInsert<"profiles">)
+    .select()
     .maybeSingle();
 
-  if (!studentRecord) {
-    const { data: linkedStudent } = await supabase
-      .from("students")
-      .select("profile_id")
-      .eq("email", email)
-      .not("profile_id", "is", null)
-      .maybeSingle();
-
-    if (linkedStudent) throw new Error("AUTH_ALREADY_REGISTERED");
-    throw new Error("AUTH_STUDENT_NOT_REGISTERED");
-  }
-
-  const existingProvider = await getEmailAuthProvider(email);
-  if (existingProvider === "email") throw new Error("AUTH_ALREADY_REGISTERED");
-  if (existingProvider === "google") throw new Error("AUTH_GOOGLE_ACCOUNT");
-
-  const { data: authData, error: signUpError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
-      data: { name: studentRecord.name, role: "student" },
-    },
-  });
-
-  if (signUpError) {
-    if (
-      signUpError.message.includes("already registered") ||
-      signUpError.message.includes("already been registered")
-    ) {
-      throw new Error("AUTH_ALREADY_REGISTERED");
-    }
-    throw signUpError;
-  }
-
-  if (!authData.user) throw new Error("Signup failed");
-
-  const userId = authData.user.id;
-
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: userId,
-    role: "student" as const,
-    name: studentRecord.name,
-    email,
-    is_active: true,
-    provider: "email" as const,
-    avatar_url: null,
-    phone: null,
-  });
-
-  if (profileError) {
+  if (profileError || !profileData) {
     await supabase.auth.signOut();
-    throw new Error(`Failed to create profile: ${profileError.message}`);
+    throw new Error(
+      `Failed to create profile: ${profileError?.message ?? "unknown"}`,
+    );
   }
 
-  const { error: linkError } = await supabase
-    .from("students")
-    .update({ profile_id: userId })
-    .eq("id", studentRecord.id);
+  const { data: adminData, error: adminError } = await supabase
+    .from("admins")
+    .insert({
+      profile_id: userId,
+      institute_name: instituteName.trim() || "Akshay Classes",
+      institute_code: code,
+      address: null,
+    } as TablesInsert<"admins">)
+    .select()
+    .maybeSingle();
 
-  if (linkError) {
-    throw new Error(`Failed to link student record: ${linkError.message}`);
+  if (adminError || !adminData) {
+    throw new Error(
+      `Failed to create admin record: ${adminError?.message ?? "unknown"}`,
+    );
   }
 
   if (!authData.session) {
     throw new Error(`AUTH_EMAIL_VERIFICATION_REQUIRED:${email}`);
   }
 
-  return (await buildAuthUser(userId)) as AuthUser;
+  return {
+    user: authData.user,
+    profile: profileData as Profile,
+    admin: adminData as AdminRecord,
+  };
 }
 
-// =========================================
-// EMAIL + PASSWORD LOGIN
-// =========================================
+// ---------------------------------------------------------------------------
+// Email login
+// ---------------------------------------------------------------------------
 export async function loginWithEmail(
   email: string,
   password: string,
-  role: Role,
-): Promise<AuthUser> {
-  const existingProvider = await getEmailAuthProvider(email);
-
-  if (existingProvider === "google") throw new Error("AUTH_EMAIL_IS_GOOGLE");
-
+): Promise<Session> {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -245,290 +108,187 @@ export async function loginWithEmail(
     if (error.message.includes("Email not confirmed")) {
       throw new Error(`AUTH_EMAIL_VERIFICATION_REQUIRED:${email}`);
     }
-    if (
-      error.message.includes("Invalid login credentials") &&
-      !existingProvider
-    ) {
-      throw new Error("AUTH_NOT_FOUND");
-    }
     throw error;
   }
 
-  if (!data.user) throw new Error("Login failed");
-
-  const authUser = await buildAuthUser(data.user.id);
-  if (!authUser) throw new Error("Profile not found");
-
-  if (authUser.role !== role) {
-    await supabase.auth.signOut();
-    throw new Error(
-      authUser.role === "student"
-        ? "AUTH_ROLE_MISMATCH_STUDENT"
-        : "AUTH_ROLE_MISMATCH_ADMIN",
-    );
-  }
-
-  if (role === "student" && !authUser.student_id) {
-    await supabase.auth.signOut();
-    throw new Error("AUTH_STUDENT_NOT_REGISTERED");
-  }
-
-  return authUser;
+  if (!data.session) throw new Error("Login failed — no session returned");
+  return data.session;
 }
 
-// =========================================
-// GOOGLE OAUTH SIGN IN
-// =========================================
-export async function loginWithGoogle(role: Role): Promise<void> {
-  localStorage.setItem("auth_intended_role", role);
-
+// ---------------------------------------------------------------------------
+// Google OAuth
+// ---------------------------------------------------------------------------
+export async function loginWithGoogle(): Promise<void> {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
-      queryParams: {
-        access_type: "offline",
-        prompt: "consent",
-      },
+      queryParams: { access_type: "offline", prompt: "consent" },
     },
   });
-
   if (error) throw error;
 }
 
-// =========================================
-// OAUTH CALLBACK HANDLER
-// =========================================
-export async function handleOAuthCallback(): Promise<AuthUser> {
-  const { data: sessionData, error: sessionError } =
-    await supabase.auth.getSession();
-
-  if (sessionError || !sessionData.session) {
-    throw new Error("AUTH_INVALID_CALLBACK");
+// ---------------------------------------------------------------------------
+// OAuth callback
+// ---------------------------------------------------------------------------
+export async function handleOAuthCallback(): Promise<Session | null> {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    return data.session;
   }
-
-  const userId = sessionData.session.user.id;
-  const email = sessionData.session.user.email!;
-  const googleName =
-    sessionData.session.user.user_metadata?.full_name ||
-    sessionData.session.user.user_metadata?.name ||
-    email.split("@")[0];
-  const avatar_url = sessionData.session.user.user_metadata?.avatar_url || null;
-
-  const intendedRole =
-    (localStorage.getItem("auth_intended_role") as Role) || "student";
-  localStorage.removeItem("auth_intended_role");
-
-  const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (existingProfile) {
-    if ((existingProfile as { provider: string }).provider === "email") {
-      await supabase.auth.signOut();
-      throw new Error("AUTH_GOOGLE_BUT_EMAIL_ACCOUNT");
-    }
-    if ((existingProfile as { role: string }).role !== intendedRole) {
-      await supabase.auth.signOut();
-      throw new Error(
-        (existingProfile as { role: string }).role === "student"
-          ? "AUTH_ROLE_MISMATCH_STUDENT"
-          : "AUTH_ROLE_MISMATCH_ADMIN",
-      );
-    }
-    return (await buildAuthUser(userId)) as AuthUser;
-  }
-
-  // New Google user
-  if (intendedRole === "admin") {
-    await supabase.from("profiles").insert({
-      id: userId,
-      role: "admin" as const,
-      name: googleName,
-      email,
-      avatar_url,
-      is_active: true,
-      provider: "google" as const,
-      phone: null,
-    });
-
-    const code = `AC${Date.now().toString(36).toUpperCase()}`;
-    await supabase.from("admins").insert({
-      profile_id: userId,
-      institute_name: "Akshay Classes",
-      institute_code: code,
-      address: null,
-    });
-  } else {
-    const { data: studentRecord } = await supabase
-      .from("students")
-      .select("*")
-      .eq("email", email)
-      .is("profile_id", null)
-      .maybeSingle();
-
-    if (!studentRecord) {
-      await supabase.auth.signOut();
-      throw new Error("AUTH_STUDENT_NOT_REGISTERED");
-    }
-
-    await supabase.from("profiles").insert({
-      id: userId,
-      role: "student" as const,
-      name: studentRecord.name,
-      email,
-      avatar_url,
-      is_active: true,
-      provider: "google" as const,
-      phone: null,
-    });
-
-    await supabase
-      .from("students")
-      .update({ profile_id: userId })
-      .eq("id", studentRecord.id);
-  }
-
-  return (await buildAuthUser(userId)) as AuthUser;
+  const { data } = await supabase.auth.getSession();
+  return data.session;
 }
 
-// =========================================
-// LOGOUT
-// =========================================
+// ---------------------------------------------------------------------------
+// Logout
+// ---------------------------------------------------------------------------
 export async function logout(): Promise<void> {
   localStorage.removeItem("auth_intended_role");
   await supabase.auth.signOut();
 }
 
-// =========================================
-// GET CURRENT SESSION
-// =========================================
-export async function getCurrentSession(): Promise<AuthUser | null> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session) return null;
-  return await buildAuthUser(sessionData.session.user.id);
+// ---------------------------------------------------------------------------
+// Session helpers
+// ---------------------------------------------------------------------------
+export async function getCurrentSession(): Promise<Session | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session;
 }
 
-// =========================================
-// RESEND VERIFICATION EMAIL
-// =========================================
-export async function resendVerificationEmail(email: string): Promise<void> {
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email,
-    options: {
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
-    },
+export async function getProfileById(userId: string): Promise<Profile | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+  return data as Profile | null;
+}
+
+export async function getAdminRecord(
+  profileId: string,
+): Promise<AdminRecord | null> {
+  const { data } = await supabase
+    .from("admins")
+    .select("*")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  return data as AdminRecord | null;
+}
+
+// ---------------------------------------------------------------------------
+// Student helpers
+// ---------------------------------------------------------------------------
+export async function checkStudentByEmail(
+  email: string,
+): Promise<Student | null> {
+  const { data } = await supabase
+    .from("students")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
+  return data as Student | null;
+}
+
+export async function verifyStudentTempPassword(
+  email: string,
+  tempPassword: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("students")
+    .select("temp_password")
+    .eq("email", email)
+    .maybeSingle();
+  if (!data) return false;
+  return (
+    (data as { temp_password: string | null }).temp_password === tempPassword
+  );
+}
+
+export async function createStudentAuthAccount(
+  email: string,
+  password: string,
+): Promise<User> {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  if (!data.user) throw new Error("Account creation failed");
+  return data.user;
+}
+
+export async function linkStudentProfile(
+  studentId: string,
+  userId: string,
+  studentFullName: string,
+  studentEmail: string,
+): Promise<void> {
+  const { error: profileError } = await supabase.from("profiles").insert({
+    id: userId,
+    role: "student" as const,
+    name: studentFullName,
+    email: studentEmail,
+    is_active: true,
+    provider: "email" as const,
+    avatar_url: null,
+    phone: null,
+    must_change_password: true,
+    temp_password: false,
+  } as TablesInsert<"profiles">);
+  if (profileError)
+    throw new Error(`Failed to create profile: ${profileError.message}`);
+
+  const { error: linkError } = await supabase
+    .from("students")
+    .update({
+      profile_id: userId,
+      must_change_password: false,
+      temp_password: null,
+    } as TablesUpdate<"students">)
+    .eq("id", studentId);
+  if (linkError)
+    throw new Error(`Failed to link student: ${linkError.message}`);
+}
+
+// ---------------------------------------------------------------------------
+// Password management
+// ---------------------------------------------------------------------------
+export async function forgotPassword(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
   });
   if (error) throw error;
 }
 
-// =========================================
-// ENROLLMENT CODE — generate, verify, link
-// =========================================
-
-/**
- * Generates an enrollment code for a student.
- * Format: FirstName + "@" + 4 random digits (e.g. "Rahul@4821")
- */
-export function generateEnrollmentCode(firstName: string): string {
-  const sanitized = firstName
-    .trim()
-    .split(/\s+/)[0]
-    .replace(/[^a-zA-Z]/g, "");
-  const digits = Math.floor(1000 + Math.random() * 9000).toString();
-  return `${sanitized}@${digits}`;
+export async function updatePassword(newPassword: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
 }
 
-/**
- * Verifies whether the provided enrollment code matches
- * the enrollment_number stored in the student record.
- */
-export async function verifyEnrollmentCode(
-  studentId: string,
-  code: string,
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("students")
-    .select("enrollment_number")
-    .eq("id", studentId)
-    .single();
-
-  if (error || !data) return false;
-  return (
-    (data as { enrollment_number: string | null }).enrollment_number?.trim() ===
-    code.trim()
-  );
+export async function resendVerificationEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
+  if (error) throw error;
 }
 
-/**
- * Links the currently authenticated user's profile to the student record
- * matching the provided enrollment code.
- * Called after a student signs in for the first time and enters their code.
- */
-export async function linkStudentProfile(
-  enrollmentCode: string,
-): Promise<void> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+// ---------------------------------------------------------------------------
+// Error message mapper
+// ---------------------------------------------------------------------------
+export function getAuthErrorMessage(error: AuthError | Error): string {
+  const code =
+    (error as AuthError & { code?: string }).code ?? error.message ?? "";
 
-  if (!session?.user) throw new Error("No authenticated user found.");
-  const userId = session.user.id;
-
-  // Find the student record matching this code that is not yet linked
-  const { data: studentRecord, error: findError } = await supabase
-    .from("students")
-    .select("id, name, email, admin_id")
-    .eq("enrollment_number", enrollmentCode.trim())
-    .is("profile_id", null)
-    .maybeSingle();
-
-  if (findError) throw new Error(`Database error: ${findError.message}`);
-  if (!studentRecord)
-    throw new Error(
-      "Invalid enrollment code or account already linked. Please contact your institute admin.",
-    );
-
-  // Check if a profile already exists for this user
-  const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (!existingProfile) {
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: userId,
-      role: "student" as const,
-      name: studentRecord.name,
-      email: studentRecord.email,
-      is_active: true,
-      provider: "email" as const,
-      avatar_url: null,
-      phone: null,
-    });
-    if (profileError)
-      throw new Error(`Failed to create profile: ${profileError.message}`);
-  }
-
-  // Link the student record to this user
-  const { error: linkError } = await supabase
-    .from("students")
-    .update({ profile_id: userId })
-    .eq("id", studentRecord.id);
-
-  if (linkError)
-    throw new Error(`Failed to link student record: ${linkError.message}`);
-}
-
-// =========================================
-// ERROR MESSAGE MAPPER
-// =========================================
-export function getAuthErrorMessage(errorCode: string): string {
-  const messages: Record<string, string> = {
+  const map: Record<string, string> = {
+    invalid_credentials: "Invalid email or password. Please try again.",
+    email_taken: "This email is already registered. Please sign in.",
+    "23505": "This email is already registered. Please sign in.",
+    over_email_send_rate_limit:
+      "Too many attempts. Please wait a moment before trying again.",
     AUTH_ALREADY_REGISTERED:
       "This email is already registered. Please sign in.",
     AUTH_GOOGLE_ACCOUNT:
@@ -545,8 +305,117 @@ export function getAuthErrorMessage(errorCode: string): string {
     AUTH_EMAIL_VERIFICATION_REQUIRED:
       "Please verify your email before logging in.",
     AUTH_INVALID_CALLBACK: "Invalid authentication callback. Please try again.",
-    AUTH_STALE_SESSION: "Your session has expired. Please sign in again.",
     AUTH_NOT_FOUND: "No account found with this email. Please sign up first.",
   };
-  return messages[errorCode] ?? "Authentication failed. Please try again.";
+
+  return (
+    map[code] ?? map[error.message] ?? "An error occurred. Please try again."
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Legacy helpers kept for backward compat (OAuth callback handler)
+// ---------------------------------------------------------------------------
+export async function handleOAuthCallbackFull(): Promise<{
+  user: User;
+  profile: Profile | null;
+  admin: AdminRecord | null;
+  intendedRole: Role;
+}> {
+  const session = await handleOAuthCallback();
+  if (!session) throw new Error("AUTH_INVALID_CALLBACK");
+
+  const userId = session.user.id;
+  const email = session.user.email!;
+  const googleName =
+    session.user.user_metadata?.full_name ??
+    session.user.user_metadata?.name ??
+    email.split("@")[0];
+  const avatar_url = session.user.user_metadata?.avatar_url ?? null;
+  const intendedRole =
+    (localStorage.getItem("auth_intended_role") as Role | null) ?? "student";
+  localStorage.removeItem("auth_intended_role");
+
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingProfile) {
+    const p = existingProfile as Profile;
+    if (p.provider === "email") {
+      await supabase.auth.signOut();
+      throw new Error("AUTH_GOOGLE_BUT_EMAIL_ACCOUNT");
+    }
+    if (p.role !== intendedRole) {
+      await supabase.auth.signOut();
+      throw new Error(
+        p.role === "student"
+          ? "AUTH_ROLE_MISMATCH_STUDENT"
+          : "AUTH_ROLE_MISMATCH_ADMIN",
+      );
+    }
+    const admin = p.role === "admin" ? await getAdminRecord(userId) : null;
+    return { user: session.user, profile: p, admin, intendedRole };
+  }
+
+  // New Google user — admin path
+  if (intendedRole === "admin") {
+    await supabase.from("profiles").insert({
+      id: userId,
+      role: "admin" as const,
+      name: googleName,
+      email,
+      avatar_url,
+      is_active: true,
+      provider: "google" as const,
+      phone: null,
+      must_change_password: false,
+      temp_password: false,
+    } as TablesInsert<"profiles">);
+    const code = `AC${Date.now().toString(36).toUpperCase()}`;
+    await supabase.from("admins").insert({
+      profile_id: userId,
+      institute_name: "Akshay Classes",
+      institute_code: code,
+      address: null,
+    } as TablesInsert<"admins">);
+    const profile = await getProfileById(userId);
+    const admin = await getAdminRecord(userId);
+    return { user: session.user, profile, admin, intendedRole };
+  }
+
+  // New Google user — student path
+  const { data: studentRecord } = await supabase
+    .from("students")
+    .select("*")
+    .eq("email", email)
+    .is("profile_id", null)
+    .maybeSingle();
+
+  if (!studentRecord) {
+    await supabase.auth.signOut();
+    throw new Error("AUTH_STUDENT_NOT_REGISTERED");
+  }
+
+  await supabase.from("profiles").insert({
+    id: userId,
+    role: "student" as const,
+    name: (studentRecord as { full_name: string }).full_name,
+    email,
+    avatar_url,
+    is_active: true,
+    provider: "google" as const,
+    phone: null,
+    must_change_password: false,
+    temp_password: false,
+  } as TablesInsert<"profiles">);
+  await supabase
+    .from("students")
+    .update({ profile_id: userId } as TablesUpdate<"students">)
+    .eq("id", (studentRecord as { id: string }).id);
+
+  const profile = await getProfileById(userId);
+  return { user: session.user, profile, admin: null, intendedRole };
 }

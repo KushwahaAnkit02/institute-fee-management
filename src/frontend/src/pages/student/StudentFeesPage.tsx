@@ -104,10 +104,10 @@ const STATUS_CONFIG = {
 };
 
 export default function StudentFeesPage() {
-  const { user } = useAuthStore();
+  useAuthStore();
   const { data: studentRecord, isLoading: studentLoading } =
     useMyStudentRecord();
-  const { data: payments = [], isLoading } = useMyPayments();
+  const { data: payments = [], isLoading } = useMyPayments(studentRecord?.id);
 
   const currentMonth = getCurrentMonthKey();
   const monthlyFee = studentRecord?.monthly_fee ?? 0;
@@ -163,7 +163,7 @@ export default function StudentFeesPage() {
     {
       title: "Monthly Fee",
       value: `₹${monthlyFee.toLocaleString("en-IN")}`,
-      sub: studentRecord?.course ?? "—",
+      sub: studentRecord?.class_id ?? "—",
       icon: IndianRupee,
       accent: "text-primary",
       bg: "bg-primary/10",
@@ -291,8 +291,7 @@ export default function StudentFeesPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               {[
-                { label: "Class", value: studentRecord.class_ },
-                { label: "Course", value: studentRecord.course },
+                { label: "Class", value: studentRecord.class_id ?? "—" },
                 {
                   label: "Joined",
                   value: new Date(studentRecord.joined_date).toLocaleDateString(
@@ -506,15 +505,15 @@ export default function StudentFeesPage() {
           )}
         </motion.div>
       </div>
-      {payModal && user && (
+      {payModal && studentRecord && (
         <UpiPayModal
           isOpen={!!payModal}
           onClose={() => setPayModal(null)}
           monthKey={payModal.monthKey}
           monthLabel={payModal.monthLabel}
           amountDue={payModal.amountDue}
-          studentId={user.student_id!}
-          adminId={user.linked_admin_id!}
+          studentId={studentRecord.id}
+          adminId={studentRecord.admin_id}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["payments"] });
             setPayModal(null);

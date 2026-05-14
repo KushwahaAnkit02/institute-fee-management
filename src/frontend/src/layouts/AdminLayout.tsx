@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/admin/students", icon: Users, label: "Students" },
   { to: "/admin/classes", icon: GraduationCap, label: "Classes" },
-  { to: "/admin/fees", icon: CreditCard, label: "Fee Collection" },
+
   { to: "/admin/payments", icon: BookOpen, label: "Payments" },
   { to: "/admin/notifications", icon: Bell, label: "Notifications" },
   { to: "/admin/settings", icon: Settings, label: "Settings" },
@@ -56,7 +56,7 @@ export function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, profile, logout } = useAuthStore();
   const navigate = useNavigate();
   const { data: notifications = [] } = useNotifications();
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -280,10 +280,12 @@ export function AdminLayout() {
             </Link>
             <div className="flex items-center gap-2 pl-2 border-l border-border/50">
               <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-primary-foreground">
-                {user?.name?.[0]?.toUpperCase() ?? "A"}
+                {profile?.name?.[0]?.toUpperCase() ??
+                  user?.email?.[0]?.toUpperCase() ??
+                  "A"}
               </div>
               <span className="hidden sm:block text-sm font-medium text-foreground truncate max-w-[120px]">
-                {user?.name ?? "Admin"}
+                {profile?.name ?? "Admin"}
               </span>
             </div>
           </div>

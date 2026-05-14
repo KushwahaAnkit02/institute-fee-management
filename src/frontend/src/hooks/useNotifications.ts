@@ -7,8 +7,8 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useNotifications() {
-  const user = useAuthStore((s) => s.user);
-  const adminId = user?.admin_id;
+  const admin = useAuthStore((s) => s.admin);
+  const adminId = admin?.id;
   return useQuery<Notification[]>({
     queryKey: ["notifications", adminId],
     queryFn: () => notifSvc.getNotifications(adminId!),
@@ -27,23 +27,23 @@ export function useStudentNotifications(studentId: string) {
 }
 
 /** Student-scoped: reads student_id from auth store automatically. */
-export function useMyNotifications() {
-  const user = useAuthStore((s) => s.user);
-  const studentId = user?.student_id ?? "";
+/** Student-scoped: pass studentId from student record lookup. */
+export function useMyNotifications(studentId?: string) {
+  const resolvedId = studentId ?? "";
   return useQuery<Notification[]>({
-    queryKey: ["notifications", "student", studentId],
-    queryFn: () => notifSvc.getNotificationsForStudent(studentId),
+    queryKey: ["notifications", "student", resolvedId],
+    queryFn: () => notifSvc.getNotificationsForStudent(resolvedId),
     staleTime: 0,
-    enabled: !!studentId,
+    enabled: !!resolvedId,
   });
 }
 
 export function useAddNotification() {
-  const user = useAuthStore((s) => s.user);
+  const admin = useAuthStore((s) => s.admin);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (form: CreateNotificationForm) =>
-      notifSvc.addNotification(user?.admin_id!, form),
+      notifSvc.addNotification(admin?.id!, form),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }
@@ -57,10 +57,10 @@ export function useMarkAsRead() {
 }
 
 export function useMarkAllAsRead() {
-  const user = useAuthStore((s) => s.user);
+  const admin = useAuthStore((s) => s.admin);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => notifSvc.markAllAsRead(user?.admin_id!),
+    mutationFn: () => notifSvc.markAllAsRead(admin?.id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }

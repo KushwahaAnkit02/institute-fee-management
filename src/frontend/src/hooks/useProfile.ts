@@ -1,3 +1,4 @@
+import type { TablesUpdate } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/authStore";
 import type { Profile } from "@/types/auth";
@@ -31,12 +32,15 @@ export function useUpdateProfile() {
       if (!user?.id) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("profiles")
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        } as TablesUpdate<"profiles">)
         .eq("id", user.id)
         .select()
         .single();
       if (error) throw error;
-      return data as Profile;
+      return data as unknown as Profile;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
   });

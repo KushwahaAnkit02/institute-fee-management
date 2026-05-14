@@ -36,7 +36,6 @@ import {
   Save,
   Sun,
   User,
-  Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
@@ -146,7 +145,7 @@ function ProfileSkeleton() {
 // ─── main component ──────────────────────────────────────────────────────────
 
 export default function StudentProfilePage() {
-  const { user, logout } = useAuthStore();
+  const { user, profile, logout } = useAuthStore();
   const { data: studentRecord, isLoading } = useMyStudentRecord();
   const { theme, setTheme } = useTheme();
   const updateStudent = useUpdateStudent();
@@ -174,9 +173,9 @@ export default function StudentProfilePage() {
     },
   });
 
-  const initials = nameInitials(user?.name ?? "S");
-  const avatarGradient = nameColorClass(user?.name ?? "S");
-  const isLinked = !!studentRecord?.enrollmentNumber;
+  const initials = nameInitials(profile?.name ?? "S");
+  const avatarGradient = nameColorClass(profile?.name ?? "S");
+  const isLinked = !!studentRecord?.enrollment_no;
 
   async function onEditSubmit(data: EditForm) {
     if (!studentRecord) return;
@@ -200,7 +199,14 @@ export default function StudentProfilePage() {
     }
     setLinking(true);
     try {
-      await linkStudentProfile(enrollCode.trim());
+      if (!studentRecord?.id || !user?.id)
+        throw new Error("Missing student or user ID");
+      await linkStudentProfile(
+        studentRecord.id,
+        user.id,
+        studentRecord.full_name,
+        studentRecord.email,
+      );
       await queryClient.invalidateQueries({ queryKey: ["student", "profile"] });
       await queryClient.invalidateQueries({ queryKey: ["students"] });
       toast.success("Account linked successfully!");
@@ -260,7 +266,7 @@ export default function StudentProfilePage() {
                 </div>
                 <div className="mb-1 min-w-0">
                   <h2 className="font-display text-xl font-bold text-foreground truncate">
-                    {user?.name ?? "Student"}
+                    {profile?.name ?? "Student"}
                   </h2>
                   <p className="text-sm text-muted-foreground truncate">
                     {user?.email}
@@ -274,20 +280,10 @@ export default function StudentProfilePage() {
                   <User className="w-3 h-3 mr-1" />
                   Student
                 </Badge>
-                {studentRecord?.class_ && (
+                {studentRecord?.class_id && (
                   <Badge className="bg-muted text-muted-foreground border-border text-xs">
                     <BookOpen className="w-3 h-3 mr-1" />
-                    {studentRecord.class_}
-                  </Badge>
-                )}
-                {studentRecord?.course && (
-                  <Badge className="bg-muted text-muted-foreground border-border text-xs">
-                    {studentRecord.course}
-                  </Badge>
-                )}
-                {studentRecord?.section && (
-                  <Badge className="bg-muted text-muted-foreground border-border text-xs">
-                    Section {studentRecord.section}
+                    {studentRecord.class_id}
                   </Badge>
                 )}
               </div>
@@ -324,19 +320,19 @@ export default function StudentProfilePage() {
                       value={studentRecord.phone}
                     />
                   )}
-                  {studentRecord.enrollmentNumber && (
+                  {studentRecord.enrollment_no && (
                     <InfoTile
                       icon={Hash}
                       label="Enrollment No."
-                      value={studentRecord.enrollmentNumber}
+                      value={studentRecord.enrollment_no}
                     />
                   )}
-                  {studentRecord.admissionDate && (
+                  {studentRecord.admission_date && (
                     <InfoTile
                       icon={CalendarDays}
                       label="Admission Date"
                       value={new Date(
-                        studentRecord.admissionDate,
+                        studentRecord.admission_date,
                       ).toLocaleDateString("en-IN", {
                         day: "2-digit",
                         month: "short",
@@ -376,7 +372,7 @@ export default function StudentProfilePage() {
                         Account Linked
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Enrollment #{studentRecord?.enrollmentNumber}
+                        Enrollment #{studentRecord?.enrollment_no}
                       </p>
                     </div>
                     <Badge className="ml-auto shrink-0 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
@@ -504,7 +500,7 @@ export default function StudentProfilePage() {
                           <div className="space-y-1.5">
                             <Label>Name</Label>
                             <Input
-                              value={studentRecord.name}
+                              value={studentRecord.full_name}
                               disabled
                               className="bg-muted/50 text-muted-foreground"
                             />
@@ -520,15 +516,7 @@ export default function StudentProfilePage() {
                           <div className="space-y-1.5">
                             <Label>Class</Label>
                             <Input
-                              value={studentRecord.class_}
-                              disabled
-                              className="bg-muted/50 text-muted-foreground"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label>Course</Label>
-                            <Input
-                              value={studentRecord.course}
+                              value={studentRecord.class_id ?? ""}
                               disabled
                               className="bg-muted/50 text-muted-foreground"
                             />
@@ -626,7 +614,7 @@ export default function StudentProfilePage() {
                   <InfoRow
                     icon={User}
                     label="Full Name"
-                    value={studentRecord.name}
+                    value={studentRecord.full_name}
                   />
                   <InfoRow
                     icon={Phone}
@@ -662,44 +650,7 @@ export default function StudentProfilePage() {
                   <InfoRow
                     icon={Hash}
                     label="Enrollment Number"
-                    value={studentRecord.enrollmentNumber}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* ── Parent / Guardian ── */}
-        {(studentRecord?.parentName || studentRecord?.parentPhone) && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.16 }}
-          >
-            <Card className="rounded-2xl shadow-soft border-border/60">
-              <CardHeader className="pb-2 pt-5 px-5 sm:px-6">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                    <Users className="w-4 h-4" />
-                  </div>
-                  <CardTitle className="text-base text-foreground">
-                    Parent / Guardian
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="px-5 sm:px-6 pb-6">
-                <Separator className="mb-4" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                  <InfoRow
-                    icon={User}
-                    label="Guardian Name"
-                    value={studentRecord?.parentName}
-                  />
-                  <InfoRow
-                    icon={Phone}
-                    label="Guardian Phone"
-                    value={studentRecord?.parentPhone}
+                    value={studentRecord.enrollment_no}
                   />
                 </div>
               </CardContent>

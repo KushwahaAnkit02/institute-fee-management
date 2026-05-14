@@ -13,9 +13,9 @@ import StudentsApi "mixins/students-api";
 import PaymentsApi "mixins/payments-api";
 import NotificationsApi "mixins/notifications-api";
 import ClassesApi "mixins/classes-api";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   // --- Authorization state (manages Internet Identity roles) ---
   let accessControlState = AccessControl.initState();

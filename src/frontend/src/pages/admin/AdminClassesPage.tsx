@@ -224,7 +224,7 @@ function ClassCard({ cls, index }: { cls: ClassRecord; index: number }) {
   const handleAddSection = async () => {
     if (!newSection.trim()) return;
     const form: CreateSectionForm = {
-      classId: cls.id,
+      class_id: cls.id,
       name: newSection.trim(),
     };
     await createSection.mutateAsync(form);

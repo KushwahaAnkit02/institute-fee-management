@@ -4,8 +4,8 @@ import type { AdminRecord } from "@/types/auth";
 import { useQuery } from "@tanstack/react-query";
 
 export function useMyAdmin() {
-  const user = useAuthStore((s) => s.user);
-  const adminId = user?.admin_id;
+  const admin = useAuthStore((s) => s.admin);
+  const adminId = admin?.id;
   return useQuery<AdminRecord | null>({
     queryKey: ["admin", adminId],
     queryFn: async () => {

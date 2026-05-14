@@ -55,7 +55,7 @@ export function StudentLayout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, profile, logout } = useAuthStore();
   const navigate = useNavigate();
   const { data: notifications = [] } = useStudentNotifications(user?.id ?? "");
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -321,10 +321,10 @@ export function StudentLayout() {
             </div>
             <div className="flex items-center gap-2 pl-2 border-l border-border/50">
               <div className="w-8 h-8 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-primary-foreground">
-                {user?.name?.[0]?.toUpperCase() ?? "S"}
+                {profile?.name?.[0]?.toUpperCase() ?? "S"}
               </div>
               <span className="hidden sm:block text-sm font-medium text-foreground truncate max-w-[120px]">
-                {user?.name ?? "Student"}
+                {profile?.name ?? "Student"}
               </span>
             </div>
           </div>

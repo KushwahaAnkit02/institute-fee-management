@@ -1,83 +1,89 @@
+import type { TablesInsert, TablesUpdate } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
-import type {
-  ClassRecord,
-  CreateClassForm,
-  CreateSectionForm,
-  SectionRecord,
-} from "@/types/student";
+import type { ClassRecord, SectionRecord } from "@/types/student";
 
-export async function getClasses(): Promise<ClassRecord[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  // Get admin record to filter by admin_id
-  const { data: adminData, error: adminError } = await supabase
-    .from("admins")
-    .select("id")
-    .eq("profile_id", user.id)
-    .single();
-  if (adminError) throw adminError;
-
+// ---------------------------------------------------------------------------
+// Classes
+// ---------------------------------------------------------------------------
+export async function getClasses(adminId: string): Promise<ClassRecord[]> {
   const { data, error } = await supabase
     .from("classes")
     .select("*")
-    .eq("admin_id", adminData.id)
+    .eq("admin_id", adminId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-
   return (data ?? []).map((row) => ({
     id: row.id as string,
-    adminId: row.admin_id as string,
+    admin_id: row.admin_id as string,
     name: row.name as string,
     description: (row.description ?? "") as string,
-    createdAt: row.created_at as string,
+    created_at: row.created_at as string,
   }));
 }
 
-export async function createClass(form: CreateClassForm): Promise<ClassRecord> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data: adminData, error: adminError } = await supabase
-    .from("admins")
-    .select("id")
-    .eq("profile_id", user.id)
-    .single();
-  if (adminError) throw adminError;
-
+export async function getClass(id: string): Promise<ClassRecord | null> {
   const { data, error } = await supabase
     .from("classes")
-    .insert({
-      admin_id: adminData.id,
-      name: form.name,
-      description: form.description,
-    })
-    .select()
-    .single();
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw error;
-
+  if (!data) return null;
   return {
     id: data.id as string,
-    adminId: data.admin_id as string,
+    admin_id: data.admin_id as string,
     name: data.name as string,
     description: (data.description ?? "") as string,
-    createdAt: data.created_at as string,
+    created_at: data.created_at as string,
+  };
+}
+
+export async function createClass(
+  adminId: string,
+  data: { name: string; description?: string },
+): Promise<ClassRecord> {
+  const { data: row, error } = await supabase
+    .from("classes")
+    .insert({
+      admin_id: adminId,
+      name: data.name,
+      description: data.description ?? null,
+    } as TablesInsert<"classes">)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error("Class creation returned no data");
+  return {
+    id: row.id as string,
+    admin_id: row.admin_id as string,
+    name: row.name as string,
+    description: (row.description ?? "") as string,
+    created_at: row.created_at as string,
   };
 }
 
 export async function updateClass(
   id: string,
-  form: CreateClassForm,
-): Promise<void> {
-  const { error } = await supabase
+  data: { name: string; description?: string },
+): Promise<ClassRecord> {
+  const { data: row, error } = await supabase
     .from("classes")
-    .update({ name: form.name, description: form.description })
-    .eq("id", id);
+    .update({
+      name: data.name,
+      description: data.description ?? null,
+    } as TablesUpdate<"classes">)
+    .eq("id", id)
+    .select()
+    .maybeSingle();
   if (error) throw error;
+  if (!row) throw new Error("Class update returned no data");
+  return {
+    id: row.id as string,
+    admin_id: row.admin_id as string,
+    name: row.name as string,
+    description: (row.description ?? "") as string,
+    created_at: row.created_at as string,
+  };
 }
 
 export async function deleteClass(id: string): Promise<void> {
@@ -85,69 +91,60 @@ export async function deleteClass(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function getSections(classId?: string): Promise<SectionRecord[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data: adminData, error: adminError } = await supabase
-    .from("admins")
-    .select("id")
-    .eq("profile_id", user.id)
-    .single();
-  if (adminError) throw adminError;
-
-  let query = supabase
+// ---------------------------------------------------------------------------
+// Sections
+// ---------------------------------------------------------------------------
+export async function getSections(classId: string): Promise<SectionRecord[]> {
+  const { data, error } = await supabase
     .from("sections")
     .select("*")
-    .eq("admin_id", adminData.id)
+    .eq("class_id", classId)
     .order("created_at", { ascending: true });
-
-  if (classId) {
-    query = query.eq("class_id", classId);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
-
   return (data ?? []).map((row) => ({
     id: row.id as string,
-    classId: row.class_id as string,
-    adminId: row.admin_id as string,
+    class_id: row.class_id as string,
     name: row.name as string,
-    createdAt: row.created_at as string,
+    created_at: row.created_at as string,
   }));
 }
 
 export async function createSection(
-  form: CreateSectionForm,
+  classId: string,
+  data: { name: string },
 ): Promise<SectionRecord> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data: adminData, error: adminError } = await supabase
-    .from("admins")
-    .select("id")
-    .eq("profile_id", user.id)
-    .single();
-  if (adminError) throw adminError;
-
-  const { data, error } = await supabase
+  const { data: row, error } = await supabase
     .from("sections")
-    .insert({ class_id: form.classId, admin_id: adminData.id, name: form.name })
+    .insert({ class_id: classId, name: data.name } as TablesInsert<"sections">)
     .select()
-    .single();
+    .maybeSingle();
   if (error) throw error;
-
+  if (!row) throw new Error("Section creation returned no data");
   return {
-    id: data.id as string,
-    classId: data.class_id as string,
-    adminId: data.admin_id as string,
-    name: data.name as string,
-    createdAt: data.created_at as string,
+    id: row.id as string,
+    class_id: row.class_id as string,
+    name: row.name as string,
+    created_at: row.created_at as string,
+  };
+}
+
+export async function updateSection(
+  id: string,
+  data: { name: string },
+): Promise<SectionRecord> {
+  const { data: row, error } = await supabase
+    .from("sections")
+    .update({ name: data.name } as TablesUpdate<"sections">)
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error("Section update returned no data");
+  return {
+    id: row.id as string,
+    class_id: row.class_id as string,
+    name: row.name as string,
+    created_at: row.created_at as string,
   };
 }
 

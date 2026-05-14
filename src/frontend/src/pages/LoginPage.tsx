@@ -8,7 +8,6 @@ import {
   loginWithGoogle,
   resendVerificationEmail,
   signUpAdmin,
-  signUpStudent,
 } from "@/services/authService";
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/types/auth";
@@ -65,7 +64,7 @@ export function LoginPage() {
     error: null,
   });
 
-  const { login: storeLogin, isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
@@ -77,9 +76,10 @@ export function LoginPage() {
     }
   }, [search?.role]);
 
-  if (isAuthenticated && user) {
+  const profile = useAuthStore((s) => s.profile);
+  if (isAuthenticated && profile) {
     navigate({
-      to: user.role === "admin" ? "/admin/dashboard" : "/student/dashboard",
+      to: profile.role === "admin" ? "/admin/dashboard" : "/student/dashboard",
       replace: true,
     });
     return null;
@@ -89,7 +89,7 @@ export function LoginPage() {
     const msg = err.message;
     // Strip the email suffix for the error key lookup
     const code = msg.includes(":") ? msg.split(":")[0] : msg;
-    return getAuthErrorMessage(code);
+    return getAuthErrorMessage(new Error(code));
   }
 
   function extractVerifyEmail(err: Error): string | null {
@@ -105,16 +105,20 @@ export function LoginPage() {
     if (!email || !password) return;
     setIsSubmitting(true);
     try {
-      const authUser = await loginWithEmail(
-        email.trim(),
-        password,
-        selectedRole,
-      );
-      storeLogin(authUser);
-      navigate({
-        to:
-          authUser.role === "admin" ? "/admin/dashboard" : "/student/dashboard",
-      });
+      await loginWithEmail(email.trim(), password);
+      await useAuthStore.getState().initialize();
+      const profile = useAuthStore.getState().profile;
+      if (profile?.must_change_password) {
+        navigate({ to: "/student/change-password", replace: true });
+      } else {
+        navigate({
+          to:
+            profile?.role === "admin"
+              ? "/admin/dashboard"
+              : "/student/dashboard",
+          replace: true,
+        });
+      }
     } catch (err) {
       const e = err as Error;
       const verifyEmail = extractVerifyEmail(e);
@@ -142,25 +146,19 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       if (selectedRole === "admin") {
-        const authUser = await signUpAdmin({
-          email: email.trim(),
+        await signUpAdmin(
+          email.trim(),
           password,
-          name: name.trim(),
-          role: "admin",
-          institute_name: instituteName.trim() || undefined,
-          institute_code: instituteCode.trim() || undefined,
-        });
-        storeLogin(authUser);
-        navigate({ to: "/admin/dashboard" });
+          name.trim(),
+          instituteName.trim(),
+          instituteCode.trim(),
+        );
+        await useAuthStore.getState().initialize();
+        navigate({ to: "/admin/dashboard", replace: true });
       } else {
-        const authUser = await signUpStudent({
-          email: email.trim(),
-          password,
-          name: name.trim(),
-          role: "student",
-        });
-        storeLogin(authUser);
-        navigate({ to: "/student/dashboard" });
+        setError(
+          "Students are added by the admin. Please contact your institute.",
+        );
       }
     } catch (err) {
       const e = err as Error;
@@ -179,7 +177,7 @@ export function LoginPage() {
     setError(null);
     setGoogleLoading(true);
     try {
-      await loginWithGoogle(selectedRole);
+      await loginWithGoogle();
       // redirect handled by Supabase OAuth
     } catch (err) {
       setError(parseErrorCode(err as Error));

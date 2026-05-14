@@ -7,21 +7,30 @@ import {
   getSections,
   updateClass,
 } from "@/services/classService";
-import type { CreateClassForm, CreateSectionForm } from "@/types/student";
+import { useAuthStore } from "@/store/authStore";
+import type {
+  ClassRecord,
+  CreateClassForm,
+  CreateSectionForm,
+  SectionRecord,
+} from "@/types/student";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export function useClasses() {
-  return useQuery({
-    queryKey: ["classes"],
-    queryFn: getClasses,
+  const adminId = useAuthStore((s) => s.admin?.id ?? "");
+  return useQuery<ClassRecord[]>({
+    queryKey: ["classes", adminId],
+    queryFn: () => getClasses(adminId),
+    enabled: !!adminId,
   });
 }
 
 export function useCreateClass() {
+  const adminId = useAuthStore((s) => s.admin?.id ?? "");
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (form: CreateClassForm) => createClass(form),
+    mutationFn: (form: CreateClassForm) => createClass(adminId, form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["classes"] });
       toast.success("Class created successfully");
@@ -63,16 +72,18 @@ export function useDeleteClass() {
 }
 
 export function useSections(classId?: string) {
-  return useQuery({
+  return useQuery<SectionRecord[]>({
     queryKey: ["sections", classId],
-    queryFn: () => getSections(classId),
+    queryFn: () => getSections(classId ?? ""),
+    enabled: !!classId,
   });
 }
 
 export function useCreateSection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (form: CreateSectionForm) => createSection(form),
+    mutationFn: (form: CreateSectionForm) =>
+      createSection(form.class_id, { name: form.name }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sections"] });
       toast.success("Section created");

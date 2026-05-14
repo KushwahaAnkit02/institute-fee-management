@@ -97,7 +97,7 @@ function RecordPaymentModal({
     try {
       await addPayment.mutateAsync({ student_id: student.id, ...form });
       toast.success(
-        `Payment of ₹${form.amount_paid.toLocaleString("en-IN")} recorded for ${student.name}!`,
+        `Payment of ₹${form.amount_paid.toLocaleString("en-IN")} recorded for ${student.full_name}!`,
       );
       onClose();
     } catch {
@@ -131,7 +131,7 @@ function RecordPaymentModal({
                     Record Payment
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    For {student.name}
+                    For {student.full_name}
                   </p>
                 </div>
                 <button
@@ -281,8 +281,8 @@ export function AdminFeesPage() {
     if (q)
       list = list.filter(
         (d) =>
-          d.student.name.toLowerCase().includes(q) ||
-          d.student.class_.toLowerCase().includes(q),
+          d.student.full_name.toLowerCase().includes(q) ||
+          (d.student.class_id ?? "").toLowerCase().includes(q),
       );
     if (filterStatus !== "all")
       list = list.filter((d) => d.status === filterStatus);
@@ -482,7 +482,7 @@ export function AdminFeesPage() {
                   data-ocid={`fees.item.${idx + 1}`}
                 >
                   <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">
-                    {student.name
+                    {student.full_name
                       .split(" ")
                       .map((n) => n[0])
                       .join("")
@@ -491,10 +491,10 @@ export function AdminFeesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-foreground truncate">
-                      {student.name}
+                      {student.full_name}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {student.class_} · {student.course}
+                      {student.class_id ?? "—"}
                     </p>
                   </div>
                   <div className="hidden sm:block text-right">

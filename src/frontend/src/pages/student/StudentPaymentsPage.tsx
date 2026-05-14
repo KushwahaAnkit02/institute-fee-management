@@ -36,7 +36,7 @@ const METHOD_ICONS: Record<PaymentMethod, string> = {
 
 export default function StudentPaymentsPage() {
   const { data: studentRecord } = useMyStudentRecord();
-  const { data: payments = [], isLoading } = useMyPayments();
+  const { data: payments = [], isLoading } = useMyPayments(studentRecord?.id);
   const [search, setSearch] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
   const [receiptModal, setReceiptModal] = useState<{

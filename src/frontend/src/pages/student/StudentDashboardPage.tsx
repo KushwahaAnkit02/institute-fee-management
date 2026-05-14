@@ -129,10 +129,12 @@ function NotificationItem({
 }
 
 export default function StudentDashboardPage() {
-  const { user } = useAuthStore();
+  const profile = useAuthStore((s) => s.profile);
   const { data: studentRecord, isLoading: studentLoading } =
     useMyStudentRecord();
-  const { data: payments = [], isLoading: paymentsLoading } = useMyPayments();
+  const { data: payments = [], isLoading: paymentsLoading } = useMyPayments(
+    studentRecord?.id,
+  );
   const { data: notifications = [], isLoading: notifLoading } =
     useStudentNotifications(studentRecord?.id ?? "");
   const markAsRead = useMarkAsRead();
@@ -181,7 +183,7 @@ export default function StudentDashboardPage() {
       icon: Wallet,
       accent: "text-primary",
       bg: "bg-primary/10",
-      subtitle: studentRecord?.course ?? "—",
+      subtitle: studentRecord?.class_id ?? "—",
     },
     {
       title: "Total Paid",
@@ -230,16 +232,13 @@ export default function StudentDashboardPage() {
               <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground mt-1">
                 Welcome back,{" "}
                 <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  {user?.name ?? "Student"}
+                  {profile?.name ?? "Student"}
                 </span>
               </h1>
               {studentRecord && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge className="bg-primary/15 text-primary border-primary/30 text-xs">
-                    {studentRecord.class_}
-                  </Badge>
-                  <Badge className="bg-muted text-muted-foreground border-border text-xs">
-                    {studentRecord.course}
+                    {studentRecord.class_id ?? "—"}
                   </Badge>
                 </div>
               )}

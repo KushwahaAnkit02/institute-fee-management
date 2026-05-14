@@ -277,10 +277,10 @@ function RecentPaymentsTable({
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-full gradient-accent flex items-center justify-center text-[10px] font-bold text-primary-foreground shrink-0">
-                          {student ? getInitials(student.name) : "?"}
+                          {student ? getInitials(student.full_name) : "?"}
                         </div>
                         <span className="font-medium text-foreground truncate max-w-[120px]">
-                          {student?.name ??
+                          {student?.full_name ??
                             `Student ${payment.student_id.slice(0, 6)}`}
                         </span>
                       </div>
@@ -361,14 +361,14 @@ function RecentStudentsList({
               data-ocid={`recent-students.item.${idx + 1}`}
             >
               <div className="w-9 h-9 rounded-full gradient-accent flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">
-                {getInitials(student.name)}
+                {getInitials(student.full_name)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-foreground text-sm truncate group-hover:text-primary transition-fast">
-                  {student.name}
+                  {student.full_name}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {student.class_} · {student.course}
+                  {student.class_id ?? "—"}
                 </p>
               </div>
               <div className="text-right shrink-0">

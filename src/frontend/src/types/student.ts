@@ -1,66 +1,73 @@
+/** Matches Supabase students table schema exactly. */
 export interface Student {
   id: string;
   profile_id: string | null;
   admin_id: string;
-  name: string;
+  class_id: string;
+  subject_id: string | null;
+  full_name: string;
   email: string;
-  class_: string;
-  course: string;
+  phone: string | null;
+  gender: "male" | "female" | "other" | null;
+  dob: string | null;
+  address: string | null;
+  enrollment_no: string | null;
+  admission_date: string | null;
   monthly_fee: number;
+  status: string;
   joined_date: string;
   fee_start_date: string;
   is_active: boolean;
+  /** Temp password stored plain-text until first login (then nulled). */
+  temp_password: string | null;
+  must_change_password: boolean;
   created_at: string;
   updated_at: string;
-  // Extended fields
-  phone?: string;
-  gender?: string;
-  dob?: string;
-  address?: string;
-  parentName?: string;
-  parentPhone?: string;
-  section?: string;
-  enrollmentNumber?: string;
-  admissionDate?: string;
 }
 
 export interface CreateStudentForm {
-  name: string;
+  full_name: string;
   email: string;
-  class_: string;
-  course: string;
+  phone: string;
+  gender: string;
+  dob: string;
+  address: string;
+  enrollment_no: string;
+  admission_date: string;
   monthly_fee: number;
-  joined_date: string;
-  fee_start_date: string;
-  phone?: string;
-  gender?: string;
-  dob?: string;
-  address?: string;
-  parentName?: string;
-  parentPhone?: string;
-  section?: string;
-  enrollmentNumber?: string;
-  admissionDate?: string;
+  status: string;
+  class_id: string;
+  subject_id: string;
 }
 
-export interface UpdateStudentForm extends Partial<CreateStudentForm> {
+export type UpdateStudentForm = Partial<CreateStudentForm> & {
   is_active?: boolean;
-}
+  must_change_password?: boolean;
+  temp_password?: string | null;
+};
 
 export interface ClassRecord {
   id: string;
-  adminId: string;
+  admin_id: string;
   name: string;
   description: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface SectionRecord {
   id: string;
-  classId: string;
-  adminId: string;
+  class_id: string;
   name: string;
-  createdAt: string;
+  created_at: string;
+}
+
+export interface SubjectRecord {
+  id: string;
+  admin_id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateClassForm {
@@ -69,8 +76,13 @@ export interface CreateClassForm {
 }
 
 export interface CreateSectionForm {
-  classId: string;
+  class_id: string;
   name: string;
+}
+
+export interface CreateSubjectForm {
+  name: string;
+  description?: string;
 }
 
 export const COURSE_OPTIONS: string[] = [
@@ -97,7 +109,11 @@ export const COURSE_OPTIONS: string[] = [
   "Other",
 ];
 
-export const GENDER_OPTIONS = ["Male", "Female", "Other"] as const;
+export const GENDER_OPTIONS: { value: string; label: string }[] = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "other", label: "Other" },
+];
 
 export const SECTION_OPTIONS = [
   "A",
@@ -109,4 +125,7 @@ export const SECTION_OPTIONS = [
   "General",
 ] as const;
 
-export const STATUS_OPTIONS = ["Active", "Inactive"] as const;
+export const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+];

@@ -4,8 +4,8 @@ import type { Payment, PaymentStats, RecordPaymentForm } from "@/types/payment";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function usePayments() {
-  const user = useAuthStore((s) => s.user);
-  const adminId = user?.admin_id;
+  const admin = useAuthStore((s) => s.admin);
+  const adminId = admin?.id;
   return useQuery<Payment[]>({
     queryKey: ["payments", adminId],
     queryFn: () => paymentSvc.getPayments(adminId!),
@@ -23,24 +23,23 @@ export function usePaymentsByStudent(studentId: string) {
   });
 }
 
-/** Student-scoped: reads student_id from auth store automatically. */
-export function useMyPayments() {
-  const user = useAuthStore((s) => s.user);
-  const studentId = user?.student_id ?? "";
+/** Student-scoped: fetches payments for the current student by looking up via profile_id. */
+export function useMyPayments(studentId?: string) {
+  const resolvedId = studentId ?? "";
   return useQuery<Payment[]>({
-    queryKey: ["payments", "student", studentId],
-    queryFn: () => paymentSvc.getPaymentsByStudent(studentId),
+    queryKey: ["payments", "student", resolvedId],
+    queryFn: () => paymentSvc.getPaymentsByStudent(resolvedId),
     staleTime: 0,
-    enabled: !!studentId,
+    enabled: !!resolvedId,
   });
 }
 
 export function useAddPayment() {
-  const user = useAuthStore((s) => s.user);
+  const admin = useAuthStore((s) => s.admin);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (form: RecordPaymentForm) =>
-      paymentSvc.addPayment(user?.admin_id!, form),
+      paymentSvc.addPayment(admin?.id!, form),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["payments"] }),
   });
 }
@@ -54,8 +53,8 @@ export function useDeletePayment() {
 }
 
 export function usePaymentStats() {
-  const user = useAuthStore((s) => s.user);
-  const adminId = user?.admin_id;
+  const admin = useAuthStore((s) => s.admin);
+  const adminId = admin?.id;
   return useQuery<PaymentStats>({
     queryKey: ["payments", "stats", adminId],
     queryFn: () => paymentSvc.getPaymentStats(adminId!),

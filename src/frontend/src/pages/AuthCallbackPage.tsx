@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,22 +19,24 @@ export function AuthCallbackPage() {
 
     async function processCallback() {
       try {
-        const authUser = await handleOAuthCallback();
+        await handleOAuthCallback();
         if (cancelled) return;
-        login(authUser);
+        await useAuthStore.getState().initialize();
+        if (cancelled) return;
+        const profile = useAuthStore.getState().profile;
         navigate({
           to:
-            authUser.role === "admin"
+            profile?.role === "admin"
               ? "/admin/dashboard"
               : "/student/dashboard",
         });
       } catch (err) {
         if (cancelled) return;
         const e = err as Error;
-        const code = e.message.includes(":")
+        const rawCode = e.message.includes(":")
           ? e.message.split(":")[0]
           : e.message;
-        setError(getAuthErrorMessage(code));
+        setError(getAuthErrorMessage(new Error(rawCode)));
       }
     }
 
@@ -42,7 +44,7 @@ export function AuthCallbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [login, navigate]);
+  }, [navigate]);
 
   if (error) {
     return (

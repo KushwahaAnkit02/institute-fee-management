@@ -1,4 +1,4 @@
-// Version: 3.0.0
+// Version: 1.0.0
 type Admin__283569800 =
   {
     address : ?Text;
@@ -56,31 +56,6 @@ type Notification__264708741 =
     title : Text;
     type_ : NotificationType__338939744
   };
-type OldStudent__333394504 =
-  {
-    address : ?Text;
-    admin_id : Text;
-    admission_date : ?Text;
-    class_ : Text;
-    course : Text;
-    created_at : Int;
-    dob : ?Text;
-    email : Text;
-    enrollment_number : ?Text;
-    fee_start_date : Int;
-    gender : ?Text;
-    id : Text;
-    is_active : Bool;
-    joined_date : Int;
-    monthly_fee : Nat;
-    name : Text;
-    parent_name : ?Text;
-    parent_phone : ?Text;
-    phone : ?Text;
-    profile_id : ?Text;
-    section : ?Text;
-    updated_at : Int
-  };
 type PaymentMethod__46913440 = {#card; #cash; #cheque; #online};
 type Profile__469549097 =
   {
@@ -133,36 +108,7 @@ type Time__900049286 = Time__796480547;
 type Timestamp__301639476 = Time__900049286;
 type UserId__158757552 = Text;
 type UserRole__1073662873 = {#admin; #guest; #user};
-actor ({
-  stable accessControlState :
-    {
-      var adminAssigned : Bool;
-      userRoles : Map__605269027<Principal, UserRole__1073662873>
-    };
-  stable admins :
-    {
-      var root : Node__46230540<Text, Admin__283569800>;
-      var size : Nat__490723111
-    };
-  in classes : Map__605269027<Text, ClassRecord__734901508>;
-  stable notifications :
-    {
-      var root : Node__46230540<Text, Notification__264708741>;
-      var size : Nat__490723111
-    };
-  stable payments :
-    {
-      var root : Node__46230540<Text, MonthlyPayment__302287223>;
-      var size : Nat__490723111
-    };
-  stable profiles :
-    {
-      var root : Node__46230540<Text, Profile__469549097>;
-      var size : Nat__490723111
-    };
-  in sections : Map__605269027<Text, SectionRecord__492154375>;
-  in students : Map__605269027<Text, OldStudent__333394504>
-}, {
+actor {
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -203,4 +149,4 @@ actor ({
       var root : Node__46230540<Text, Student__26715999>;
       var size : Nat__490723111
     }
-});
+};
