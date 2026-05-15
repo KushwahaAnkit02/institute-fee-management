@@ -26,7 +26,6 @@ import {
   type Student,
   type SubjectRecord,
 } from "@/types/student";
-import { generateTempPassword } from "@/utils/password";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus, UserRoundPen } from "lucide-react";
 import { motion } from "motion/react";
@@ -120,10 +119,9 @@ export function StudentModal({
       class_id: values.class_id,
       subject_id: values.subject_id,
     };
-    const tempPassword = isEdit
-      ? undefined
-      : generateTempPassword(values.full_name);
-    onSuccess(formData, tempPassword);
+    // Pass undefined for edit mode — createStudent generates the temp password server-side
+    // For new students, pass undefined too: the service generates and returns it in the response
+    onSuccess(formData, undefined);
   }
 
   return (

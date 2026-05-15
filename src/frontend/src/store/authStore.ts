@@ -9,7 +9,7 @@ import { create } from "zustand";
  */
 let _initializing = false;
 
-export const useAuthStore = create<AuthState>()((set, get) => ({
+export const useAuthStore = create<AuthState>()((set, _get) => ({
   // -----------------------------------------------------------------------
   // Initial state
   // -----------------------------------------------------------------------
@@ -97,17 +97,33 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   /**
-   * Re-fetches profile + admin from DB without a full re-initialization.
-   * Use after profile updates, password change, etc.
+   * Re-fetches session + profile + admin from DB without a full re-initialization.
+   * Also updates the user object from the active session.
+   * Use after login, profile updates, password change, etc.
    */
   refreshUser: async () => {
-    const { user } = get();
-    if (!user) return;
+    // Always refresh from the active session so user is up to date
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      set({
+        user: null,
+        profile: null,
+        admin: null,
+        isAuthenticated: false,
+        isInitialized: true,
+      });
+      return;
+    }
+
+    const supaUser = session.user;
 
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", supaUser.id)
       .maybeSingle();
 
     const profile = profileData as Profile | null;
@@ -117,12 +133,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const { data: adminData } = await supabase
         .from("admins")
         .select("*")
-        .eq("profile_id", user.id)
+        .eq("profile_id", supaUser.id)
         .maybeSingle();
       admin = adminData as AdminRecord | null;
     }
 
-    set({ profile, admin });
+    set({
+      user: supaUser,
+      profile,
+      admin,
+      isAuthenticated: true,
+      isInitialized: true,
+    });
   },
 
   /** Signs out from Supabase and clears all auth state. */

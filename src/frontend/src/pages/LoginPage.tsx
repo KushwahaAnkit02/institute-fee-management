@@ -8,6 +8,7 @@ import {
   loginWithGoogle,
   resendVerificationEmail,
   signUpAdmin,
+  studentLoginWithTempPassword,
 } from "@/services/authService";
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/types/auth";
@@ -105,25 +106,49 @@ export function LoginPage() {
     if (!email || !password) return;
     setIsSubmitting(true);
     try {
-      await loginWithEmail(email.trim(), password);
-      await useAuthStore.getState().initialize();
-      const profile = useAuthStore.getState().profile;
-      if (profile?.must_change_password) {
-        navigate({ to: "/student/change-password", replace: true });
+      if (selectedRole === "student") {
+        // Student login — uses temp-password flow that creates auth account on first login
+        const { mustChangePassword } = await studentLoginWithTempPassword(
+          email.trim(),
+          password,
+        );
+        await useAuthStore.getState().refreshUser();
+        if (mustChangePassword) {
+          navigate({ to: "/student/change-password", replace: true });
+        } else {
+          navigate({ to: "/student/dashboard", replace: true });
+        }
       } else {
-        navigate({
-          to:
-            profile?.role === "admin"
-              ? "/admin/dashboard"
-              : "/student/dashboard",
-          replace: true,
-        });
+        // Admin login — standard email + password
+        await loginWithEmail(email.trim(), password);
+        await useAuthStore.getState().refreshUser();
+        const profile = useAuthStore.getState().profile;
+        if (profile?.role !== "admin") {
+          setError(
+            "This account is not registered as an admin. Please select the correct role.",
+          );
+          await useAuthStore.getState().logout();
+          return;
+        }
+        navigate({ to: "/admin/dashboard", replace: true });
       }
     } catch (err) {
       const e = err as Error;
       const verifyEmail = extractVerifyEmail(e);
       if (verifyEmail) {
         setVerifyState({ email: verifyEmail, resent: false, resending: false });
+        return;
+      }
+      // Map student-specific error codes
+      if (
+        e.message === "AUTH_INVALID_STUDENT_CREDENTIALS" ||
+        e.message === "AUTH_STUDENT_NOT_REGISTERED"
+      ) {
+        setError(
+          e.message === "AUTH_STUDENT_NOT_REGISTERED"
+            ? "You are not registered by the institute. Please contact your admin."
+            : "Invalid email or password. Please check your credentials.",
+        );
         return;
       }
       setError(parseErrorCode(e));
@@ -135,6 +160,15 @@ export function LoginPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Students cannot sign up publicly
+    if (selectedRole === "student") {
+      setError(
+        "Student accounts are created by your institute admin. Please contact your admin for login credentials.",
+      );
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -145,21 +179,15 @@ export function LoginPage() {
     }
     setIsSubmitting(true);
     try {
-      if (selectedRole === "admin") {
-        await signUpAdmin(
-          email.trim(),
-          password,
-          name.trim(),
-          instituteName.trim(),
-          instituteCode.trim(),
-        );
-        await useAuthStore.getState().initialize();
-        navigate({ to: "/admin/dashboard", replace: true });
-      } else {
-        setError(
-          "Students are added by the admin. Please contact your institute.",
-        );
-      }
+      await signUpAdmin(
+        email.trim(),
+        password,
+        name.trim(),
+        instituteName.trim(),
+        instituteCode.trim(),
+      );
+      await useAuthStore.getState().refreshUser();
+      navigate({ to: "/admin/dashboard", replace: true });
     } catch (err) {
       const e = err as Error;
       const verifyEmail = extractVerifyEmail(e);

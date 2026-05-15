@@ -20605,8 +20605,8 @@ function shouldShowDeprecationWarning() {
   return parseInt(versionMatch[1], 10) <= 18;
 }
 if (shouldShowDeprecationWarning()) console.warn("⚠️  Node.js 18 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 20 or later. For more information, visit: https://github.com/orgs/supabase/discussions/37217");
-const supabaseUrl = "https://vtjsynirfpuyxaunawgj.supabase.co";
-const supabaseAnonKey = "sb_publishable_hxV3GygABLo0dT8x5L2eoA_pHT0u1Go";
+const supabaseUrl = void 0;
+const supabaseAnonKey = void 0;
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -21102,7 +21102,7 @@ const createImpl = (createState2) => {
 };
 const create = (createState2) => createImpl;
 let _initializing = false;
-const useAuthStore = create()((set2, get2) => ({
+const useAuthStore = create()((set2, _get) => ({
   // -----------------------------------------------------------------------
   // Initial state
   // -----------------------------------------------------------------------
@@ -21169,20 +21169,39 @@ const useAuthStore = create()((set2, get2) => ({
     }
   },
   /**
-   * Re-fetches profile + admin from DB without a full re-initialization.
-   * Use after profile updates, password change, etc.
+   * Re-fetches session + profile + admin from DB without a full re-initialization.
+   * Also updates the user object from the active session.
+   * Use after login, profile updates, password change, etc.
    */
   refreshUser: async () => {
-    const { user } = get2();
-    if (!user) return;
-    const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+    if (!(session == null ? void 0 : session.user)) {
+      set2({
+        user: null,
+        profile: null,
+        admin: null,
+        isAuthenticated: false,
+        isInitialized: true
+      });
+      return;
+    }
+    const supaUser = session.user;
+    const { data: profileData } = await supabase.from("profiles").select("*").eq("id", supaUser.id).maybeSingle();
     const profile = profileData;
     let admin = null;
     if ((profile == null ? void 0 : profile.role) === "admin") {
-      const { data: adminData } = await supabase.from("admins").select("*").eq("profile_id", user.id).maybeSingle();
+      const { data: adminData } = await supabase.from("admins").select("*").eq("profile_id", supaUser.id).maybeSingle();
       admin = adminData;
     }
-    set2({ profile, admin });
+    set2({
+      user: supaUser,
+      profile,
+      admin,
+      isAuthenticated: true,
+      isInitialized: true
+    });
   },
   /** Signs out from Supabase and clears all auth state. */
   logout: async () => {
@@ -53588,6 +53607,62 @@ async function resendVerificationEmail(email2) {
   });
   if (error) throw error;
 }
+async function studentLoginWithTempPassword(email2, password) {
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: email2, password });
+  if (!signInError && signInData.session) {
+    const { data: profileRow } = await supabase.from("profiles").select("must_change_password").eq("id", signInData.session.user.id).maybeSingle();
+    const mustChange = (profileRow == null ? void 0 : profileRow.must_change_password) ?? false;
+    return { session: signInData.session, mustChangePassword: mustChange };
+  }
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email: email2,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+  });
+  if (signUpError) {
+    if (signUpError.message.includes("already registered") || signUpError.message.includes("already been registered") || signUpError.code === "email_taken") {
+      throw new Error("AUTH_INVALID_STUDENT_CREDENTIALS");
+    }
+    throw new Error("AUTH_INVALID_STUDENT_CREDENTIALS");
+  }
+  if (!signUpData.session || !signUpData.user) {
+    throw new Error(`AUTH_EMAIL_VERIFICATION_REQUIRED:${email2}`);
+  }
+  const userId = signUpData.user.id;
+  const session = signUpData.session;
+  const { data: studentRow } = await supabase.from("students").select(
+    "id, full_name, email, temp_password, profile_id, must_change_password"
+  ).eq("email", email2).is("profile_id", null).maybeSingle();
+  if (!studentRow) {
+    await supabase.auth.signOut();
+    throw new Error("AUTH_STUDENT_NOT_REGISTERED");
+  }
+  const student = studentRow;
+  if (student.temp_password !== password) {
+    await supabase.auth.signOut();
+    throw new Error("AUTH_INVALID_STUDENT_CREDENTIALS");
+  }
+  const { error: profileError } = await supabase.from("profiles").insert({
+    id: userId,
+    role: "student",
+    name: student.full_name,
+    email: student.email,
+    is_active: true,
+    provider: "email",
+    avatar_url: null,
+    phone: null,
+    must_change_password: true,
+    temp_password: false
+  });
+  if (profileError) {
+    await supabase.auth.signOut();
+    throw new Error(
+      `Failed to create student profile: ${profileError.message}`
+    );
+  }
+  await supabase.from("students").update({ profile_id: userId }).eq("id", student.id);
+  return { session, mustChangePassword: true };
+}
 function getAuthErrorMessage(error) {
   const code = error.code ?? error.message ?? "";
   const map2 = {
@@ -53604,7 +53679,8 @@ function getAuthErrorMessage(error) {
     AUTH_STUDENT_NOT_REGISTERED: "You are not registered by the institute yet.",
     AUTH_EMAIL_VERIFICATION_REQUIRED: "Please verify your email before logging in.",
     AUTH_INVALID_CALLBACK: "Invalid authentication callback. Please try again.",
-    AUTH_NOT_FOUND: "No account found with this email. Please sign up first."
+    AUTH_NOT_FOUND: "No account found with this email. Please sign up first.",
+    AUTH_INVALID_STUDENT_CREDENTIALS: "Invalid email or password. Please check your credentials."
   };
   return map2[code] ?? map2[error.message] ?? "An error occurred. Please try again.";
 }
@@ -55325,22 +55401,41 @@ function LoginPage() {
     if (!email2 || !password) return;
     setIsSubmitting(true);
     try {
-      await loginWithEmail(email2.trim(), password);
-      await useAuthStore.getState().initialize();
-      const profile2 = useAuthStore.getState().profile;
-      if (profile2 == null ? void 0 : profile2.must_change_password) {
-        navigate({ to: "/student/change-password", replace: true });
+      if (selectedRole === "student") {
+        const { mustChangePassword } = await studentLoginWithTempPassword(
+          email2.trim(),
+          password
+        );
+        await useAuthStore.getState().refreshUser();
+        if (mustChangePassword) {
+          navigate({ to: "/student/change-password", replace: true });
+        } else {
+          navigate({ to: "/student/dashboard", replace: true });
+        }
       } else {
-        navigate({
-          to: (profile2 == null ? void 0 : profile2.role) === "admin" ? "/admin/dashboard" : "/student/dashboard",
-          replace: true
-        });
+        await loginWithEmail(email2.trim(), password);
+        await useAuthStore.getState().refreshUser();
+        const profile2 = useAuthStore.getState().profile;
+        if ((profile2 == null ? void 0 : profile2.role) !== "admin") {
+          setError(
+            "This account is not registered as an admin. Please select the correct role."
+          );
+          await useAuthStore.getState().logout();
+          return;
+        }
+        navigate({ to: "/admin/dashboard", replace: true });
       }
     } catch (err) {
       const e22 = err;
       const verifyEmail = extractVerifyEmail(e22);
       if (verifyEmail) {
         setVerifyState({ email: verifyEmail, resent: false, resending: false });
+        return;
+      }
+      if (e22.message === "AUTH_INVALID_STUDENT_CREDENTIALS" || e22.message === "AUTH_STUDENT_NOT_REGISTERED") {
+        setError(
+          e22.message === "AUTH_STUDENT_NOT_REGISTERED" ? "You are not registered by the institute. Please contact your admin." : "Invalid email or password. Please check your credentials."
+        );
         return;
       }
       setError(parseErrorCode(e22));
@@ -55351,6 +55446,12 @@ function LoginPage() {
   async function handleSignUp(e3) {
     e3.preventDefault();
     setError(null);
+    if (selectedRole === "student") {
+      setError(
+        "Student accounts are created by your institute admin. Please contact your admin for login credentials."
+      );
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -55361,21 +55462,15 @@ function LoginPage() {
     }
     setIsSubmitting(true);
     try {
-      if (selectedRole === "admin") {
-        await signUpAdmin(
-          email2.trim(),
-          password,
-          name.trim(),
-          instituteName.trim(),
-          instituteCode.trim()
-        );
-        await useAuthStore.getState().initialize();
-        navigate({ to: "/admin/dashboard", replace: true });
-      } else {
-        setError(
-          "Students are added by the admin. Please contact your institute."
-        );
-      }
+      await signUpAdmin(
+        email2.trim(),
+        password,
+        name.trim(),
+        instituteName.trim(),
+        instituteCode.trim()
+      );
+      await useAuthStore.getState().refreshUser();
+      navigate({ to: "/admin/dashboard", replace: true });
     } catch (err) {
       const e22 = err;
       const verifyEmail = extractVerifyEmail(e22);
@@ -94711,8 +94806,7 @@ function StudentModal({
       class_id: values.class_id,
       subject_id: values.subject_id
     };
-    const tempPassword = isEdit ? void 0 : generateTempPassword(values.full_name);
-    onSuccess(formData, tempPassword);
+    onSuccess(formData, void 0);
   }
   return /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open, onOpenChange: (o2) => !o2 && handleClose(), children: /* @__PURE__ */ jsxRuntimeExports.jsx(DialogContent, { className: "max-w-2xl max-h-[90vh] overflow-y-auto p-0", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
     motion.div,

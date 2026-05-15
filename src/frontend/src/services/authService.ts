@@ -277,6 +277,118 @@ export async function resendVerificationEmail(email: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Student login with temp password (first-login creates auth account)
+// ---------------------------------------------------------------------------
+export async function studentLoginWithTempPassword(
+  email: string,
+  password: string,
+): Promise<{ session: Session; mustChangePassword: boolean }> {
+  // Step 1: Try normal sign-in first (handles returning students with existing accounts)
+  const { data: signInData, error: signInError } =
+    await supabase.auth.signInWithPassword({ email, password });
+
+  if (!signInError && signInData.session) {
+    // Existing account — load profile to check mustChangePassword
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", signInData.session.user.id)
+      .maybeSingle();
+    const mustChange =
+      (profileRow as { must_change_password: boolean } | null)
+        ?.must_change_password ?? false;
+    return { session: signInData.session, mustChangePassword: mustChange };
+  }
+
+  // Step 2: Sign-in failed — try signing up (first-time login with temp password)
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
+
+  if (signUpError) {
+    // "User already registered" means account exists but password is wrong
+    if (
+      signUpError.message.includes("already registered") ||
+      signUpError.message.includes("already been registered") ||
+      (signUpError as AuthError & { code?: string }).code === "email_taken"
+    ) {
+      throw new Error("AUTH_INVALID_STUDENT_CREDENTIALS");
+    }
+    throw new Error("AUTH_INVALID_STUDENT_CREDENTIALS");
+  }
+
+  // No session after signUp means email confirmation is required
+  if (!signUpData.session || !signUpData.user) {
+    throw new Error(`AUTH_EMAIL_VERIFICATION_REQUIRED:${email}`);
+  }
+
+  const userId = signUpData.user.id;
+  const session = signUpData.session;
+
+  // Step 3: New account created — verify it's a valid student (check students table)
+  const { data: studentRow } = await supabase
+    .from("students")
+    .select(
+      "id, full_name, email, temp_password, profile_id, must_change_password",
+    )
+    .eq("email", email)
+    .is("profile_id", null)
+    .maybeSingle();
+
+  if (!studentRow) {
+    // No student record found — not registered by admin or already linked
+    await supabase.auth.signOut();
+    throw new Error("AUTH_STUDENT_NOT_REGISTERED");
+  }
+
+  const student = studentRow as {
+    id: string;
+    full_name: string;
+    email: string;
+    temp_password: string | null;
+    profile_id: string | null;
+    must_change_password: boolean;
+  };
+
+  // Verify the supplied password matches the stored temp_password
+  if (student.temp_password !== password) {
+    await supabase.auth.signOut();
+    throw new Error("AUTH_INVALID_STUDENT_CREDENTIALS");
+  }
+
+  // Step 4: Create profile row for the new student
+  const { error: profileError } = await supabase.from("profiles").insert({
+    id: userId,
+    role: "student" as const,
+    name: student.full_name,
+    email: student.email,
+    is_active: true,
+    provider: "email" as const,
+    avatar_url: null,
+    phone: null,
+    must_change_password: true,
+    temp_password: false,
+  } as TablesInsert<"profiles">);
+
+  if (profileError) {
+    await supabase.auth.signOut();
+    throw new Error(
+      `Failed to create student profile: ${profileError.message}`,
+    );
+  }
+
+  // Step 5: Link the student row to the new auth account
+  await supabase
+    .from("students")
+    .update({ profile_id: userId } as TablesUpdate<"students">)
+    .eq("id", student.id);
+
+  return { session, mustChangePassword: true };
+}
+
+// ---------------------------------------------------------------------------
 // Error message mapper
 // ---------------------------------------------------------------------------
 export function getAuthErrorMessage(error: AuthError | Error): string {
@@ -306,6 +418,8 @@ export function getAuthErrorMessage(error: AuthError | Error): string {
       "Please verify your email before logging in.",
     AUTH_INVALID_CALLBACK: "Invalid authentication callback. Please try again.",
     AUTH_NOT_FOUND: "No account found with this email. Please sign up first.",
+    AUTH_INVALID_STUDENT_CREDENTIALS:
+      "Invalid email or password. Please check your credentials.",
   };
 
   return (
